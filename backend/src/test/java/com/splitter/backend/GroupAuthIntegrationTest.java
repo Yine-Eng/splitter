@@ -10,6 +10,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Map;
 
@@ -19,57 +20,83 @@ import static org.assertj.core.api.Assertions.assertThat;
         classes = com.splitter.backend.SplitterBackendApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
+@ActiveProfiles("test")
 public class GroupAuthIntegrationTest {
-
         @LocalServerPort
         private int port;
 
         private ObjectMapper mapper = new ObjectMapper();
 
-        
-
         @Test
         void signupSigninCreateGroupFlow() throws Exception {
-                var signup = Map.of("username", "itestuser", "password", "TestPass1!");
+
+                var signup = Map.of(
+                        "username", "itestuser_" + System.currentTimeMillis(),
+                        "password", "TestPass1!"
+                );
 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
                 HttpEntity<String> signupReq = new HttpEntity<>(mapper.writeValueAsString(signup), headers);
 
-                                RestTemplate plain = new RestTemplate();
-                                plain.setErrorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
-                                        @Override
-                                        public boolean hasError(org.springframework.http.client.ClientHttpResponse response) {
-                                                return false;
-                                        }
-                                });
+                RestTemplate plain = new RestTemplate();
 
-                                String base = "http://localhost:" + port;
+                // Prevent RestTemplate from throwing exceptions
+                plain.setErrorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
+                        @Override
+                        public boolean hasError(org.springframework.http.client.ClientHttpResponse response) {
+                                return false;
+                        }
+                });
 
-                                // signup
-                                ResponseEntity<String> signupResp = plain.postForEntity(base + "/api/auth/signup", signupReq, String.class);
+                String base = "http://localhost:" + port;
+
+                // ---------- SIGNUP ----------
+                ResponseEntity<String> signupResp =
+                        plain.postForEntity(base + "/api/auth/signup", signupReq, String.class);
+
                 assertThat(signupResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-                // signin
-                                ResponseEntity<String> signinResp = plain.postForEntity(base + "/api/auth/signin", signupReq, String.class);
+                // ---------- SIGNIN ----------
+                ResponseEntity<String> signinResp =
+                        plain.postForEntity(base + "/api/auth/signin", signupReq, String.class);
+
                 assertThat(signinResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-                Map<String, Object> signinMap = mapper.readValue(signinResp.getBody(), new TypeReference<>() {});
+                Map<String, Object> signinMap =
+                        mapper.readValue(signinResp.getBody(), new TypeReference<>() {});
+
                 String token = signinMap.get("token").toString();
+
                 System.out.println("TEST TOKEN: " + token);
 
-                // create group with token
+                // ---------- CREATE GROUP ----------
                 HttpHeaders authHeaders = new HttpHeaders();
                 authHeaders.set("Authorization", "Bearer " + token);
                 authHeaders.setContentType(MediaType.APPLICATION_JSON);
-                ResponseEntity<String> createResp = plain.postForEntity(base + "/api/groups?name=ITestGroup", new HttpEntity<>("", authHeaders), String.class);
+
+                ResponseEntity<String> createResp =
+                        plain.postForEntity(
+                                base + "/api/groups?name=ITestGroup",
+                                new HttpEntity<>("", authHeaders),
+                                String.class
+                        );
+
                 assertThat(createResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-                Map<String, Object> groupMap = mapper.readValue(createResp.getBody(), new TypeReference<>() {});
+                Map<String, Object> groupMap =
+                        mapper.readValue(createResp.getBody(), new TypeReference<>() {});
+
                 assertThat(groupMap.get("name")).isEqualTo("ITestGroup");
 
-                // unauthenticated should be 4xx
-                ResponseEntity<String> noAuthResp = plain.postForEntity(base + "/api/groups?name=NoAuth", new HttpEntity<>("", new HttpHeaders()), String.class);
+                // ---------- UNAUTHENTICATED REQUEST ----------
+                ResponseEntity<String> noAuthResp =
+                        plain.postForEntity(
+                                base + "/api/groups?name=NoAuth",
+                                new HttpEntity<>("", new HttpHeaders()),
+                                String.class
+                        );
+
                 assertThat(noAuthResp.getStatusCode().is4xxClientError()).isTrue();
         }
 }

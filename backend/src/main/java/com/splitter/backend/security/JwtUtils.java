@@ -13,7 +13,7 @@ import java.util.Date;
 @Component
 public class JwtUtils {
 
-    @Value("${app.jwtSecret:ChangeMeSecretKeyWhichShouldBeLong}")
+    @Value("${app.jwtSecret:ChangeMeSecretKeyWhichShouldBeLongEnoughForJWT256}")
     private String jwtSecret;
 
     @Value("${app.jwtExpirationMs:3600000}")
