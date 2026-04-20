@@ -2,7 +2,11 @@ package com.splitter.backend.expense.controller;
 
 import com.splitter.backend.expense.model.Expense;
 import com.splitter.backend.expense.service.ExpenseService;
+import com.splitter.backend.models.User;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,13 +22,17 @@ public class ExpenseController {
     }
 
     @PostMapping
-    public Expense createExpense(@RequestBody CreateExpenseRequest request) {
+    public Expense createExpense(@RequestBody CreateExpenseRequest request, Authentication authentication) {
+
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found");
+        }
 
         return expenseService.createExpense(
                 request.groupId(),
                 request.description(),
                 request.amount(),
-                request.paidByUserId(),
+                user.getId(),
                 request.participants()
         );
     }
