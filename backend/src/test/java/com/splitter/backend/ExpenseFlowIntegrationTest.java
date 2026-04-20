@@ -2,7 +2,10 @@ package com.splitter.backend;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.splitter.backend.models.User;
+import com.splitter.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -21,6 +24,9 @@ public class ExpenseFlowIntegrationTest {
 
     @LocalServerPort
     private int port;
+
+        @Autowired
+        private UserRepository userRepository;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -76,6 +82,9 @@ public class ExpenseFlowIntegrationTest {
 
         assertThat(token).isNotNull();
 
+        User signedInUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Signed in user was not found"));
+
 
         // ---------- CREATE GROUP ----------
         HttpHeaders authHeaders = new HttpHeaders();
@@ -107,7 +116,7 @@ public class ExpenseFlowIntegrationTest {
                 "description","Dinner",
                 "amount",120,
                 "paidByUserId",1,
-                "participants", List.of(1)
+                "participants", List.of(signedInUser.getId())
         );
 
         HttpEntity<String> expenseReq =
@@ -123,5 +132,11 @@ public class ExpenseFlowIntegrationTest {
         System.out.println("Expense response: " + expenseResp.getBody());
 
         assertThat(expenseResp.getStatusCode().is2xxSuccessful()).isTrue();
+
+        Map<String,Object> expenseResponseBody =
+                mapper.readValue(expenseResp.getBody(), new TypeReference<>() {});
+
+        assertThat(Long.valueOf(expenseResponseBody.get("paidByUserId").toString()))
+                .isEqualTo(signedInUser.getId());
     }
 }
