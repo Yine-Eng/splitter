@@ -42,7 +42,7 @@ public class BalanceFlowIntegrationTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
-    void fullBalanceFlow() throws Exception {
+    void fullBalanceFlow_withBigDecimalAndUnevenSplit() throws Exception {
 
         RestTemplate client = new RestTemplate();
 
@@ -143,11 +143,11 @@ public class BalanceFlowIntegrationTest {
         );
 
         // ---------- CREATE EXPENSE 1 ----------
-        // User 1 pays $100 for both users => user2 owes user1 $50
+        // User 1 pays 10.00 for both users => user2 owes user1 5.00
         Map<String, Object> expense1 = Map.of(
                 "groupId", groupId,
                 "description", "Dinner",
-                "amount", 100,
+                "amount", "10.00",
                 "paidByUserId", user1.getId(),
                 "participants", List.of(user1.getId(), user2.getId())
         );
@@ -161,7 +161,7 @@ public class BalanceFlowIntegrationTest {
         assertThat(expense1Resp.getStatusCode().is2xxSuccessful()).isTrue();
 
         // ---------- CREATE EXPENSE 2 ----------
-        // User 2 pays $40 for both users => user1 owes user2 $20
+        // User 2 pays 3.33 for both users => user1 owes user2 1.67
         HttpHeaders authHeadersUser2 = new HttpHeaders();
         authHeadersUser2.set("Authorization", "Bearer " + tokenUser2);
         authHeadersUser2.setContentType(MediaType.APPLICATION_JSON);
@@ -169,7 +169,7 @@ public class BalanceFlowIntegrationTest {
         Map<String, Object> expense2 = Map.of(
                 "groupId", groupId,
                 "description", "Uber",
-                "amount", 40,
+                "amount", "3.33",
                 "paidByUserId", user2.getId(),
                 "participants", List.of(user1.getId(), user2.getId())
         );
@@ -211,7 +211,7 @@ public class BalanceFlowIntegrationTest {
 
         assertThat(Long.valueOf(balance.get("fromUserId").toString())).isEqualTo(user2.getId());
         assertThat(Long.valueOf(balance.get("toUserId").toString())).isEqualTo(user1.getId());
-        assertThat(Double.valueOf(balance.get("amount").toString())).isEqualTo(30.0);
+        assertThat(balance.get("amount").toString()).isEqualTo("3.33");
 
         // ---------- NON-MEMBER SHOULD BE FORBIDDEN ----------
         String outsiderUsername = "outsider_" + System.currentTimeMillis();

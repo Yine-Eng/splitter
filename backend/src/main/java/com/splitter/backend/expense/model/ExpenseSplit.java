@@ -1,6 +1,8 @@
 package com.splitter.backend.expense.model;
 
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -17,15 +19,15 @@ public class ExpenseSplit {
     @Column(nullable = false)
     private Long userId;
 
-    @Column(nullable = false)
-    private double amountOwed;
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal amountOwed;
 
     @Column(nullable = false)
     private boolean paid;
 
     public ExpenseSplit() {}
 
-    public ExpenseSplit(UUID expenseId, Long userId, double amountOwed) {
+    public ExpenseSplit(UUID expenseId, Long userId, BigDecimal amountOwed) {
         this.expenseId = expenseId;
         this.userId = userId;
         this.amountOwed = amountOwed;
@@ -34,7 +36,7 @@ public class ExpenseSplit {
 
     public UUID getExpenseId() { return expenseId; }
     public Long getUserId() { return userId; }
-    public double getAmountOwed() { return amountOwed; }
+    public BigDecimal getAmountOwed() { return amountOwed; }
     public boolean isPaid() { return paid; }
 
     public void setPaid(boolean paid) { this.paid = paid; }
