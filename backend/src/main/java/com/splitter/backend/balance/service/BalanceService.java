@@ -23,6 +23,9 @@ import com.splitter.backend.expense.repository.ExpenseSplitRepository;
 import com.splitter.backend.group.repository.GroupMemberRepository;
 import com.splitter.backend.models.User;
 import com.splitter.backend.repository.UserRepository;
+import com.splitter.backend.settlement.model.Settlement;
+import com.splitter.backend.settlement.model.SettlementStatus;
+import com.splitter.backend.settlement.repository.SettlementRepository;
 
 @Service
 public class BalanceService {
@@ -31,17 +34,20 @@ public class BalanceService {
     private final ExpenseSplitRepository expenseSplitRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
+    private final SettlementRepository settlementRepository;
 
     public BalanceService(
             ExpenseRepository expenseRepository,
             ExpenseSplitRepository expenseSplitRepository,
             GroupMemberRepository groupMemberRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            SettlementRepository settlementRepository
     ) {
         this.expenseRepository = expenseRepository;
         this.expenseSplitRepository = expenseSplitRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.userRepository = userRepository;
+        this.settlementRepository = settlementRepository;
     }
 
     public BalanceResponse getGroupBalances(UUID groupId, String requesterUsername) {
@@ -63,10 +69,21 @@ public class BalanceService {
             );
         }
 
+        Map<Long, Map<Long, BigDecimal>> rawBalances = new HashMap<>();
+
+        addExpenseSplitsToBalances(groupId, rawBalances);
+        subtractConfirmedSettlementsFromBalances(groupId, rawBalances);
+
+        List<UserBalanceDto> simplifiedBalances = simplifyBalances(rawBalances);
+
+        return new BalanceResponse(groupId, simplifiedBalances);
+    }
+
+    private void addExpenseSplitsToBalances(UUID groupId, Map<Long, Map<Long, BigDecimal>> rawBalances) {
         List<Expense> expenses = expenseRepository.findByGroupId(groupId);
 
         if (expenses.isEmpty()) {
-            return new BalanceResponse(groupId, Collections.emptyList());
+            return;
         }
 
         Map<UUID, Expense> expenseById = new HashMap<>();
@@ -78,8 +95,6 @@ public class BalanceService {
         }
 
         List<ExpenseSplit> allSplits = expenseSplitRepository.findByExpenseIdIn(expenseIds);
-
-        Map<Long, Map<Long, BigDecimal>> rawBalances = new HashMap<>();
 
         for (ExpenseSplit split : allSplits) {
             if (split.isPaid()) {
@@ -103,10 +118,37 @@ public class BalanceService {
                     .computeIfAbsent(debtorId, ignored -> new HashMap<>())
                     .merge(creditorId, amount, BigDecimal::add);
         }
+    }
 
-        List<UserBalanceDto> simplifiedBalances = simplifyBalances(rawBalances);
+    private void subtractConfirmedSettlementsFromBalances(UUID groupId, Map<Long, Map<Long, BigDecimal>> rawBalances) {
+        List<Settlement> confirmedSettlements =
+                settlementRepository.findByGroupIdAndStatus(groupId, SettlementStatus.CONFIRMED);
 
-        return new BalanceResponse(groupId, simplifiedBalances);
+        for (Settlement settlement : confirmedSettlements) {
+            Long fromUserId = settlement.getFromUserId();
+            Long toUserId = settlement.getToUserId();
+            BigDecimal amount = settlement.getAmount();
+
+            if (fromUserId.equals(toUserId) || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            BigDecimal currentDebt = rawBalances
+                    .getOrDefault(fromUserId, Collections.emptyMap())
+                    .getOrDefault(toUserId, BigDecimal.ZERO);
+
+                if (currentDebt.compareTo(BigDecimal.ZERO) <= 0) {
+                // Ignore inconsistent settlement directions instead of creating reverse debt.
+                continue;
+            }
+
+                BigDecimal appliedAmount = amount.min(currentDebt);
+                BigDecimal remainingDebt = currentDebt.subtract(appliedAmount);
+
+                rawBalances
+                    .computeIfAbsent(fromUserId, ignored -> new HashMap<>())
+                    .put(toUserId, remainingDebt);
+        }
     }
 
     private List<UserBalanceDto> simplifyBalances(Map<Long, Map<Long, BigDecimal>> rawBalances) {
