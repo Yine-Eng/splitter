@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,7 +41,7 @@ public class ExpenseController {
     public record CreateExpenseRequest(
             UUID groupId,
             String description,
-            double amount,
+            BigDecimal amount,
             Long paidByUserId,
             List<Long> participants
     ) {}

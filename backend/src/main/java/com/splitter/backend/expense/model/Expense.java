@@ -1,6 +1,8 @@
 package com.splitter.backend.expense.model;
 
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -18,8 +20,8 @@ public class Expense {
     @Column(nullable = false)
     private String description;
 
-    @Column(nullable = false)
-    private double amount;
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal amount;
 
     @Column(nullable = false)
     private Long paidByUserId;
@@ -28,7 +30,7 @@ public class Expense {
 
     public Expense() {}
 
-    public Expense(UUID groupId, String description, double amount, Long paidByUserId) {
+    public Expense(UUID groupId, String description, BigDecimal amount, Long paidByUserId) {
         this.groupId = groupId;
         this.description = description;
         this.amount = amount;
@@ -39,7 +41,7 @@ public class Expense {
     public UUID getId() { return id; }
     public UUID getGroupId() { return groupId; }
     public String getDescription() { return description; }
-    public double getAmount() { return amount; }
+    public BigDecimal getAmount() { return amount; }
     public Long getPaidByUserId() { return paidByUserId; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 

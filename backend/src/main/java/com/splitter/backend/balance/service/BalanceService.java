@@ -1,5 +1,6 @@
 package com.splitter.backend.balance.service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -78,7 +79,7 @@ public class BalanceService {
 
         List<ExpenseSplit> allSplits = expenseSplitRepository.findByExpenseIdIn(expenseIds);
 
-        Map<Long, Map<Long, Double>> rawBalances = new HashMap<>();
+        Map<Long, Map<Long, BigDecimal>> rawBalances = new HashMap<>();
 
         for (ExpenseSplit split : allSplits) {
             if (split.isPaid()) {
@@ -92,15 +93,15 @@ public class BalanceService {
 
             Long debtorId = split.getUserId();
             Long creditorId = expense.getPaidByUserId();
-            double amount = split.getAmountOwed();
+            BigDecimal amount = split.getAmountOwed();
 
-            if (debtorId.equals(creditorId) || amount <= 0) {
+            if (debtorId.equals(creditorId) || amount.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
 
             rawBalances
                     .computeIfAbsent(debtorId, ignored -> new HashMap<>())
-                    .merge(creditorId, amount, Double::sum);
+                    .merge(creditorId, amount, BigDecimal::add);
         }
 
         List<UserBalanceDto> simplifiedBalances = simplifyBalances(rawBalances);
@@ -108,18 +109,18 @@ public class BalanceService {
         return new BalanceResponse(groupId, simplifiedBalances);
     }
 
-    private List<UserBalanceDto> simplifyBalances(Map<Long, Map<Long, Double>> rawBalances) {
+    private List<UserBalanceDto> simplifyBalances(Map<Long, Map<Long, BigDecimal>> rawBalances) {
         List<UserBalanceDto> result = new ArrayList<>();
         Set<String> visitedPairs = new HashSet<>();
 
-        for (Map.Entry<Long, Map<Long, Double>> debtorEntry : rawBalances.entrySet()) {
+        for (Map.Entry<Long, Map<Long, BigDecimal>> debtorEntry : rawBalances.entrySet()) {
             Long fromUser = debtorEntry.getKey();
 
-            for (Map.Entry<Long, Double> creditorEntry : debtorEntry.getValue().entrySet()) {
+            for (Map.Entry<Long, BigDecimal> creditorEntry : debtorEntry.getValue().entrySet()) {
                 Long toUser = creditorEntry.getKey();
-                double forwardAmount = creditorEntry.getValue();
+                BigDecimal forwardAmount = creditorEntry.getValue();
 
-                if (forwardAmount <= 0 || fromUser.equals(toUser)) {
+                if (forwardAmount.compareTo(BigDecimal.ZERO) <= 0 || fromUser.equals(toUser)) {
                     continue;
                 }
 
@@ -130,16 +131,16 @@ public class BalanceService {
                     continue;
                 }
 
-                double reverseAmount = rawBalances
+                BigDecimal reverseAmount = rawBalances
                         .getOrDefault(toUser, Collections.emptyMap())
-                        .getOrDefault(fromUser, 0.0);
+                        .getOrDefault(fromUser, BigDecimal.ZERO);
 
-                double net = forwardAmount - reverseAmount;
+                BigDecimal net = forwardAmount.subtract(reverseAmount);
 
-                if (net > 0.000001) {
-                    result.add(new UserBalanceDto(fromUser, toUser, roundToTwoDecimals(net)));
-                } else if (net < -0.000001) {
-                    result.add(new UserBalanceDto(toUser, fromUser, roundToTwoDecimals(Math.abs(net))));
+                if (net.compareTo(BigDecimal.ZERO) > 0) {
+                    result.add(new UserBalanceDto(fromUser, toUser, net));
+                } else if (net.compareTo(BigDecimal.ZERO) < 0) {
+                    result.add(new UserBalanceDto(toUser, fromUser, net.abs()));
                 }
 
                 visitedPairs.add(pairKey);
@@ -148,9 +149,5 @@ public class BalanceService {
         }
 
         return result;
-    }
-
-    private double roundToTwoDecimals(double value) {
-        return Math.round(value * 100.0) / 100.0;
     }
 }

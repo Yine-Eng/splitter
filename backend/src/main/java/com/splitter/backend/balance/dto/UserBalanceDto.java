@@ -1,15 +1,17 @@
 package com.splitter.backend.balance.dto;
 
+import java.math.BigDecimal;
+
 public class UserBalanceDto {
 
     private Long fromUserId;
     private Long toUserId;
-    private double amount;
+    private BigDecimal amount;
 
     public UserBalanceDto() {
     }
 
-    public UserBalanceDto(Long fromUserId, Long toUserId, double amount) {
+    public UserBalanceDto(Long fromUserId, Long toUserId, BigDecimal amount) {
         this.fromUserId = fromUserId;
         this.toUserId = toUserId;
         this.amount = amount;
@@ -31,11 +33,11 @@ public class UserBalanceDto {
         this.toUserId = toUserId;
     }
 
-    public double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(double amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 }
