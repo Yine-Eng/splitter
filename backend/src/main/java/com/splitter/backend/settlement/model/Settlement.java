@@ -106,6 +106,10 @@ public class Settlement {
         return rejectedAt;
     }
 
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
     public void setStatus(SettlementStatus status) {
         this.status = status;
     }

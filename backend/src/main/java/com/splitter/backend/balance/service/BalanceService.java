@@ -137,15 +137,15 @@ public class BalanceService {
                     .getOrDefault(fromUserId, Collections.emptyMap())
                     .getOrDefault(toUserId, BigDecimal.ZERO);
 
-                if (currentDebt.compareTo(BigDecimal.ZERO) <= 0) {
+            if (currentDebt.compareTo(BigDecimal.ZERO) <= 0) {
                 // Ignore inconsistent settlement directions instead of creating reverse debt.
                 continue;
             }
 
-                BigDecimal appliedAmount = amount.min(currentDebt);
-                BigDecimal remainingDebt = currentDebt.subtract(appliedAmount);
+            BigDecimal appliedAmount = amount.min(currentDebt);
+            BigDecimal remainingDebt = currentDebt.subtract(appliedAmount);
 
-                rawBalances
+            rawBalances
                     .computeIfAbsent(fromUserId, ignored -> new HashMap<>())
                     .put(toUserId, remainingDebt);
         }

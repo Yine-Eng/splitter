@@ -121,6 +121,25 @@ public class SettlementService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only pending settlements can be confirmed");
         }
 
+        BalanceResponse balanceResponse = balanceService.getGroupBalances(settlement.getGroupId(), confirmerUsername);
+
+        BigDecimal currentDebt = balanceResponse.getBalances().stream()
+                .filter(balance ->
+                        balance.getFromUserId().equals(settlement.getFromUserId())
+                                && balance.getToUserId().equals(settlement.getToUserId()))
+                .map(UserBalanceDto::getAmount)
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
+
+        if (currentDebt.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No outstanding debt exists to confirm this settlement");
+        }
+
+        if (settlement.getAmount().compareTo(currentDebt) > 0) {
+            settlement.setAmount(currentDebt);
+        }
+
         settlement.setStatus(SettlementStatus.CONFIRMED);
         settlement.setConfirmedAt(LocalDateTime.now());
 
