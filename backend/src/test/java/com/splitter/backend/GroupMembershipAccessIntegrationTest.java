@@ -99,7 +99,6 @@ public class GroupMembershipAccessIntegrationTest {
                 String.class
         );
 
-        // ---------- DUPLICATE MEMBER IS REJECTED ----------
         assertThat(duplicateMemberResp.getStatusCode().value()).isEqualTo(400);
 
         // ---------- NON-ADMIN MEMBER CANNOT ADD ANOTHER MEMBER ----------
