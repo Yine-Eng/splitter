@@ -10,4 +10,5 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     List<Expense> findByGroupId(UUID groupId);
 
+    List<Expense> findByGroupIdOrderByCreatedAtDesc(UUID groupId);
 }
