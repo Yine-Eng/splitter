@@ -3,7 +3,10 @@ package com.splitter.backend.group.service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -63,9 +66,6 @@ public class GroupService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username or email is required");
         }
 
-        User targetUser = userRepository.findByUsername(targetUsername.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Target user does not exist"));
-
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
 
@@ -77,7 +77,9 @@ public class GroupService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can add members");
         }
 
-        // check for duplicate after confirming requester has permission
+        User targetUser = userRepository.findByUsername(targetUsername.trim())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Target user does not exist"));
+
         boolean alreadyMember = groupMemberRepository
                 .findByGroupIdAndUserId(group.getId(), targetUser.getId())
                 .isPresent();
@@ -103,11 +105,21 @@ public class GroupService {
         ensureUserIsGroupMember(groupId, requester.getId());
 
         List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
+
+        List<Long> userIds = members.stream()
+                .map(GroupMember::getUserId)
+                .toList();
+
+        Map<Long, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
         List<GroupMemberResponse> responses = new ArrayList<>();
 
         for (GroupMember member : members) {
-            User user = userRepository.findById(member.getUserId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group member user not found"));
+            User user = userMap.get(member.getUserId());
+            if (user == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Group member user not found");
+            }
 
             responses.add(new GroupMemberResponse(
                     user.getId(),
@@ -126,11 +138,21 @@ public class GroupService {
         User user = getUserByUsername(username);
 
         List<GroupMember> memberships = groupMemberRepository.findByUserId(user.getId());
+
+        List<UUID> groupIds = memberships.stream()
+                .map(GroupMember::getGroupId)
+                .toList();
+
+        Map<UUID, Group> groupMap = groupRepository.findByIdIn(groupIds).stream()
+                .collect(Collectors.toMap(Group::getId, Function.identity()));
+
         List<GroupSummaryResponse> responses = new ArrayList<>();
 
         for (GroupMember membership : memberships) {
-            Group group = groupRepository.findById(membership.getGroupId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+            Group group = groupMap.get(membership.getGroupId());
+            if (group == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found");
+            }
 
             responses.add(new GroupSummaryResponse(
                     group.getId(),

@@ -92,7 +92,7 @@ public class GroupMembershipAccessIntegrationTest {
         assertThat(addedMemberMap.get("username").toString()).isEqualTo(memberUsername);
         assertThat(addedMemberMap.get("role").toString()).isEqualTo("MEMBER");
 
-        // ---------- DUPLICATE MEMBER IS REJECTED (as Forbidden due to permission check order) ----------
+        // ---------- DUPLICATE MEMBER IS REJECTED ----------
         ResponseEntity<String> duplicateMemberResp = client.postForEntity(
                 base + "/api/groups/" + groupId + "/members",
                 new HttpEntity<>(mapper.writeValueAsString(addMemberRequest), adminHeaders),
@@ -100,7 +100,7 @@ public class GroupMembershipAccessIntegrationTest {
         );
 
         // ---------- DUPLICATE MEMBER IS REJECTED ----------
-        assertThat(duplicateMemberResp.getStatusCode().value()).isEqualTo(403);
+        assertThat(duplicateMemberResp.getStatusCode().value()).isEqualTo(400);
 
         // ---------- NON-ADMIN MEMBER CANNOT ADD ANOTHER MEMBER ----------
         Map<String, Object> addOutsiderRequest = Map.of(
