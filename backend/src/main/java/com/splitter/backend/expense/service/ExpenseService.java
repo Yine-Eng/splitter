@@ -1,6 +1,7 @@
 package com.splitter.backend.expense.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -92,7 +93,7 @@ public class ExpenseService {
             }
         }
 
-        BigDecimal normalizedAmount = amount.setScale(2);
+        BigDecimal normalizedAmount = amount.setScale(2, RoundingMode.HALF_UP);
 
         Expense expense = new Expense(groupId, description.trim(), normalizedAmount, paidByUserId);
         Expense savedExpense = expenseRepository.save(expense);
