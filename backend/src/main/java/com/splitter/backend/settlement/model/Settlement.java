@@ -107,6 +107,9 @@ public class Settlement {
     }
 
     public void setAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Settlement amount must be greater than zero");
+        }
         this.amount = amount;
     }
 

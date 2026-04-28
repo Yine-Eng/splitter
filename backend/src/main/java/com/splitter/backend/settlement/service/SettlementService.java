@@ -6,8 +6,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.splitter.backend.balance.dto.BalanceResponse;
@@ -24,6 +27,8 @@ import com.splitter.backend.settlement.repository.SettlementRepository;
 
 @Service
 public class SettlementService {
+
+    private static final Logger log = LoggerFactory.getLogger(SettlementService.class);
 
     private final SettlementRepository settlementRepository;
     private final UserRepository userRepository;
@@ -106,6 +111,7 @@ public class SettlementService {
         return toResponse(saved);
     }
 
+    @Transactional
     public SettlementResponse confirmSettlement(UUID settlementId, String confirmerUsername) {
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Settlement not found"));
@@ -137,6 +143,8 @@ public class SettlementService {
         }
 
         if (settlement.getAmount().compareTo(currentDebt) > 0) {
+            log.info("Settlement {} amount {} exceeds current debt {}; adjusting to current debt",
+                    settlementId, settlement.getAmount(), currentDebt);
             settlement.setAmount(currentDebt);
         }
 
