@@ -28,6 +28,16 @@ import com.splitter.backend.repository.UserRepository;
 import com.splitter.backend.event.model.GroupEventType;
 import com.splitter.backend.event.model.GroupEventVisibility;
 import com.splitter.backend.event.service.GroupEventService;
+import com.splitter.backend.balance.dto.BalanceResponse;
+import com.splitter.backend.balance.dto.UserBalanceDto;
+import com.splitter.backend.balance.service.BalanceService;
+import com.splitter.backend.group.dto.GroupMemberRemovalPreviewResponse;
+import com.splitter.backend.group.dto.RemovalBalanceItem;
+import com.splitter.backend.settlement.model.Settlement;
+import com.splitter.backend.settlement.model.SettlementStatus;
+import com.splitter.backend.settlement.repository.SettlementRepository;
+
+import java.math.BigDecimal;
 
 @Service
 public class GroupService {
@@ -37,18 +47,24 @@ public class GroupService {
     private final UserRepository userRepository;
     private final ExpenseRepository expenseRepository;
     private final GroupEventService groupEventService;
+    private final BalanceService balanceService;
+    private final SettlementRepository settlementRepository;
 
     public GroupService(
             GroupRepository groupRepository,
             GroupMemberRepository groupMemberRepository,
             UserRepository userRepository,
             ExpenseRepository expenseRepository,
-            GroupEventService groupEventService) {
+            GroupEventService groupEventService,
+            BalanceService balanceService,
+            SettlementRepository settlementRepository) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.userRepository = userRepository;
         this.expenseRepository = expenseRepository;
         this.groupEventService = groupEventService;
+        this.balanceService = balanceService;
+        this.settlementRepository = settlementRepository;
     }
 
     public Group createGroup(String name, String creatorUsername) {
@@ -76,7 +92,7 @@ public class GroupService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
 
         GroupMember requesterMembership = groupMemberRepository
-                .findByGroupIdAndUserId(group.getId(), requester.getId())
+                .findByGroupIdAndUserIdAndActiveTrue(group.getId(), requester.getId())
                 .orElseThrow(
                         () -> new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group"));
 
@@ -88,7 +104,7 @@ public class GroupService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Target user does not exist"));
 
         boolean alreadyMember = groupMemberRepository
-                .findByGroupIdAndUserId(group.getId(), targetUser.getId())
+                .findByGroupIdAndUserIdAndActiveTrue(group.getId(), targetUser.getId())
                 .isPresent();
 
         if (alreadyMember) {
@@ -119,7 +135,7 @@ public class GroupService {
 
         ensureUserIsGroupMember(groupId, requester.getId());
 
-        List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
+        List<GroupMember> members = groupMemberRepository.findByGroupIdAndActiveTrue(groupId);
 
         List<Long> userIds = members.stream()
                 .map(GroupMember::getUserId)
@@ -151,7 +167,7 @@ public class GroupService {
     public List<GroupSummaryResponse> getGroupsForUser(String username) {
         User user = getUserByUsername(username);
 
-        List<GroupMember> memberships = groupMemberRepository.findByUserId(user.getId());
+        List<GroupMember> memberships = groupMemberRepository.findByUserIdAndActiveTrue(user.getId());
 
         List<UUID> groupIds = memberships.stream()
                 .map(GroupMember::getGroupId)
@@ -210,11 +226,148 @@ public class GroupService {
 
     private void ensureUserIsGroupMember(UUID groupId, Long userId) {
         boolean isMember = groupMemberRepository
-                .findByGroupIdAndUserId(groupId, userId)
+                .findByGroupIdAndUserIdAndActiveTrue(groupId, userId)
                 .isPresent();
 
         if (!isMember) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group");
+        }
+    }
+
+    public GroupMemberRemovalPreviewResponse previewMemberRemoval(
+            UUID groupId,
+            Long targetUserId,
+            String requesterUsername) {
+        User requester = getUserByUsername(requesterUsername);
+        ensureUserIsGroupAdmin(groupId, requester.getId());
+
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Target user does not exist"));
+
+        groupMemberRepository.findByGroupIdAndUserIdAndActiveTrue(groupId, targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "User is not an active member of this group"));
+
+        return buildRemovalPreview(groupId, targetUser);
+    }
+
+    public GroupMemberRemovalPreviewResponse removeMember(
+            UUID groupId,
+            Long targetUserId,
+            String requesterUsername,
+            boolean confirmOutstandingBalances) {
+        User requester = getUserByUsername(requesterUsername);
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+
+        ensureUserIsGroupAdmin(groupId, requester.getId());
+
+        if (requester.getId().equals(targetUserId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Admins cannot remove themselves using this endpoint");
+        }
+
+        if (group.getCreatedByUserId().equals(targetUserId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Group creator cannot be removed in this version");
+        }
+
+        GroupMember targetMembership = groupMemberRepository
+                .findByGroupIdAndUserIdAndActiveTrue(groupId, targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "User is not an active member of this group"));
+
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Target user does not exist"));
+
+        GroupMemberRemovalPreviewResponse preview = buildRemovalPreview(groupId, targetUser);
+
+        if (preview.getPendingSettlementCount() > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This member has pending settlements. Resolve them before removal.");
+        }
+
+        boolean hasOutstandingBalances = !preview.getUserOwes().isEmpty() || !preview.getUserIsOwed().isEmpty();
+
+        if (hasOutstandingBalances && !confirmOutstandingBalances) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This member has outstanding balances. Preview balances and confirm removal if you still want to proceed.");
+        }
+
+        targetMembership.markRemoved();
+        groupMemberRepository.save(targetMembership);
+
+        groupEventService.createGroupEvent(
+                groupId,
+                GroupEventType.MEMBER_REMOVED,
+                GroupEventVisibility.GROUP,
+                requester.getId(),
+                targetUserId,
+                null,
+                "Member removed from group");
+
+        return preview;
+    }
+
+    private GroupMemberRemovalPreviewResponse buildRemovalPreview(UUID groupId, User targetUser) {
+        BalanceResponse balanceResponse = balanceService.getGroupBalances(groupId, targetUser.getUsername());
+
+        List<RemovalBalanceItem> userOwes = new ArrayList<>();
+        List<RemovalBalanceItem> userIsOwed = new ArrayList<>();
+
+        for (UserBalanceDto balance : balanceResponse.getBalances()) {
+            if (balance.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            if (balance.getFromUserId().equals(targetUser.getId())) {
+                userOwes.add(new RemovalBalanceItem(
+                        balance.getFromUserId(),
+                        balance.getToUserId(),
+                        balance.getAmount()));
+            }
+
+            if (balance.getToUserId().equals(targetUser.getId())) {
+                userIsOwed.add(new RemovalBalanceItem(
+                        balance.getFromUserId(),
+                        balance.getToUserId(),
+                        balance.getAmount()));
+            }
+        }
+
+        List<Settlement> pendingSettlements = settlementRepository.findByGroupIdAndStatus(groupId,
+                SettlementStatus.PENDING);
+
+        int pendingCount = 0;
+        for (Settlement settlement : pendingSettlements) {
+            if (settlement.getFromUserId().equals(targetUser.getId())
+                    || settlement.getToUserId().equals(targetUser.getId())) {
+                pendingCount++;
+            }
+        }
+
+        boolean canRemoveWithoutConfirmation = userOwes.isEmpty() && userIsOwed.isEmpty() && pendingCount == 0;
+
+        return new GroupMemberRemovalPreviewResponse(
+                groupId,
+                targetUser.getId(),
+                targetUser.getUsername(),
+                userOwes,
+                userIsOwed,
+                pendingCount,
+                canRemoveWithoutConfirmation);
+    }
+
+    private void ensureUserIsGroupAdmin(UUID groupId, Long userId) {
+        GroupMember membership = groupMemberRepository
+                .findByGroupIdAndUserIdAndActiveTrue(groupId, userId)
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group"));
+
+        if (membership.getRole() != GroupRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can perform this action");
         }
     }
 }

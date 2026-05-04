@@ -25,6 +25,11 @@ public class GroupMember {
     @Column(nullable = false)
     private LocalDateTime joinedAt;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
+    private LocalDateTime removedAt;
+
     public GroupMember() {
     }
 
@@ -33,6 +38,7 @@ public class GroupMember {
         this.userId = userId;
         this.role = role;
         this.joinedAt = LocalDateTime.now();
+        this.active = true;
     }
 
     public UUID getId() {
@@ -55,7 +61,20 @@ public class GroupMember {
         return joinedAt;
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
+    public LocalDateTime getRemovedAt() {
+        return removedAt;
+    }
+
     public void setRole(GroupRole role) {
         this.role = role;
+    }
+
+    public void markRemoved() {
+        this.active = false;
+        this.removedAt = LocalDateTime.now();
     }
 }
