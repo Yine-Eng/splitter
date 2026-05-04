@@ -57,7 +57,7 @@ public class BalanceService {
                         "Authenticated user not found"));
 
         boolean isMember = groupMemberRepository
-                .findByGroupIdAndUserId(groupId, requester.getId())
+                .findByGroupIdAndUserIdAndActiveTrue(groupId, requester.getId())
                 .isPresent();
 
         if (!isMember) {

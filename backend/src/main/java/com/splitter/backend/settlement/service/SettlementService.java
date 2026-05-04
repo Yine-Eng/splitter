@@ -75,11 +75,11 @@ public class SettlementService {
         }
 
         boolean requesterInGroup = groupMemberRepository
-                .findByGroupIdAndUserId(request.groupId(), fromUser.getId())
+                .findByGroupIdAndUserIdAndActiveTrue(request.groupId(), fromUser.getId())
                 .isPresent();
 
         boolean recipientInGroup = groupMemberRepository
-                .findByGroupIdAndUserId(request.groupId(), request.toUserId())
+                .findByGroupIdAndUserIdAndActiveTrue(request.groupId(), request.toUserId())
                 .isPresent();
 
         if (!requesterInGroup || !recipientInGroup) {
@@ -240,7 +240,7 @@ public class SettlementService {
                         () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
 
         boolean isMember = groupMemberRepository
-                .findByGroupIdAndUserId(groupId, requester.getId())
+                .findByGroupIdAndUserIdAndActiveTrue(groupId, requester.getId())
                 .isPresent();
 
         if (!isMember) {

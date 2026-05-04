@@ -75,7 +75,7 @@ public class ExpenseService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
 
-        List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
+        List<GroupMember> members = groupMemberRepository.findByGroupIdAndActiveTrue(groupId);
         Set<Long> memberIds = new HashSet<>();
         for (GroupMember member : members) {
             memberIds.add(member.getUserId());
