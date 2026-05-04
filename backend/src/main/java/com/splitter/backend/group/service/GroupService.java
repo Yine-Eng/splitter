@@ -24,6 +24,9 @@ import com.splitter.backend.group.repository.GroupMemberRepository;
 import com.splitter.backend.group.repository.GroupRepository;
 import com.splitter.backend.models.User;
 import com.splitter.backend.repository.UserRepository;
+import com.splitter.backend.event.model.GroupEventType;
+import com.splitter.backend.event.model.GroupEventVisibility;
+import com.splitter.backend.event.service.GroupEventService;
 
 @Service
 public class GroupService {
@@ -32,17 +35,19 @@ public class GroupService {
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
     private final ExpenseRepository expenseRepository;
+    private final GroupEventService groupEventService;
 
     public GroupService(
             GroupRepository groupRepository,
             GroupMemberRepository groupMemberRepository,
             UserRepository userRepository,
-            ExpenseRepository expenseRepository
-    ) {
+            ExpenseRepository expenseRepository,
+            GroupEventService groupEventService) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.userRepository = userRepository;
         this.expenseRepository = expenseRepository;
+        this.groupEventService = groupEventService;
     }
 
     public Group createGroup(String name, String creatorUsername) {
@@ -51,8 +56,7 @@ public class GroupService {
         Group group = new Group(name, creator.getId());
         Group savedGroup = groupRepository.save(group);
 
-        GroupMember creatorMembership =
-                new GroupMember(savedGroup.getId(), creator.getId(), GroupRole.ADMIN);
+        GroupMember creatorMembership = new GroupMember(savedGroup.getId(), creator.getId(), GroupRole.ADMIN);
 
         groupMemberRepository.save(creatorMembership);
 
@@ -71,7 +75,8 @@ public class GroupService {
 
         GroupMember requesterMembership = groupMemberRepository
                 .findByGroupIdAndUserId(group.getId(), requester.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group"));
 
         if (requesterMembership.getRole() != GroupRole.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admins can add members");
@@ -91,12 +96,20 @@ public class GroupService {
         GroupMember newMember = new GroupMember(group.getId(), targetUser.getId(), GroupRole.MEMBER);
         GroupMember savedMember = groupMemberRepository.save(newMember);
 
+        groupEventService.createGroupEvent(
+                group.getId(),
+                GroupEventType.MEMBER_ADDED,
+                GroupEventVisibility.GROUP,
+                requester.getId(),
+                targetUser.getId(),
+                null,
+                "Member added to group");
+
         return new GroupMemberResponse(
                 targetUser.getId(),
                 targetUser.getUsername(),
                 savedMember.getRole(),
-                savedMember.getJoinedAt()
-        );
+                savedMember.getJoinedAt());
     }
 
     public List<GroupMemberResponse> getGroupMembers(UUID groupId, String requesterUsername) {
@@ -125,8 +138,7 @@ public class GroupService {
                     user.getId(),
                     user.getUsername(),
                     member.getRole(),
-                    member.getJoinedAt()
-            ));
+                    member.getJoinedAt()));
         }
 
         responses.sort(Comparator.comparing(GroupMemberResponse::getJoinedAt));
@@ -159,8 +171,7 @@ public class GroupService {
                     group.getName(),
                     group.getCreatedByUserId(),
                     group.getCreatedAt(),
-                    membership.getRole()
-            ));
+                    membership.getRole()));
         }
 
         responses.sort(Comparator.comparing(GroupSummaryResponse::getCreatedAt).reversed());
@@ -183,8 +194,7 @@ public class GroupService {
                     expense.getDescription(),
                     expense.getAmount(),
                     expense.getPaidByUserId(),
-                    expense.getCreatedAt()
-            ));
+                    expense.getCreatedAt()));
         }
 
         return responses;
@@ -192,7 +202,8 @@ public class GroupService {
 
     private User getUserByUsername(String username) {
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
     }
 
     private void ensureUserIsGroupMember(UUID groupId, Long userId) {
