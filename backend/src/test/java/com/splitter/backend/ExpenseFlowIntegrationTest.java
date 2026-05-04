@@ -22,121 +22,112 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 public class ExpenseFlowIntegrationTest {
 
-    @LocalServerPort
-    private int port;
+        @LocalServerPort
+        private int port;
 
         @Autowired
         private UserRepository userRepository;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+        private final ObjectMapper mapper = new ObjectMapper();
 
-    @Test
-    void fullExpenseFlow() throws Exception {
+        @Test
+        void fullExpenseFlow() throws Exception {
 
-        RestTemplate client = new RestTemplate();
+                RestTemplate client = new RestTemplate();
 
-        // Prevent RestTemplate from throwing exceptions on 4xx/5xx
-        client.setErrorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
-            @Override
-            public boolean hasError(org.springframework.http.client.ClientHttpResponse response) {
-                return false;
-            }
-        });
+                // Prevent RestTemplate from throwing exceptions on 4xx/5xx
+                client.setErrorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
+                        @Override
+                        public boolean hasError(org.springframework.http.client.ClientHttpResponse response) {
+                                return false;
+                        }
+                });
 
-        String base = "http://localhost:" + port;
+                String base = "http://localhost:" + port;
 
-        System.out.println("SERVER STARTED ON: " + base);
+                System.out.println("SERVER STARTED ON: " + base);
 
-        // ---------- SIGNUP ----------
-        String username = "expensetest_" + System.currentTimeMillis();
+                // ---------- SIGNUP ----------
+                String username = "expensetest_" + System.currentTimeMillis();
 
-        Map<String,String> signup = Map.of(
-                "username", username,
-                "password","TestPass1!"
-        );
+                Map<String, String> signup = Map.of(
+                                "username", username,
+                                "password", "TestPass1!");
 
-        HttpHeaders jsonHeaders = new HttpHeaders();
-        jsonHeaders.setContentType(MediaType.APPLICATION_JSON);
+                HttpHeaders jsonHeaders = new HttpHeaders();
+                jsonHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-        HttpEntity<String> signupReq =
-                new HttpEntity<>(mapper.writeValueAsString(signup), jsonHeaders);
+                HttpEntity<String> signupReq = new HttpEntity<>(mapper.writeValueAsString(signup), jsonHeaders);
 
-        ResponseEntity<String> signupResp =
-                client.postForEntity(base + "/api/auth/signup", signupReq, String.class);
+                ResponseEntity<String> signupResp = client.postForEntity(base + "/api/auth/signup", signupReq,
+                                String.class);
 
-        System.out.println("Signup response: " + signupResp.getBody());
+                System.out.println("Signup response: " + signupResp.getBody());
 
-        assertThat(signupResp.getStatusCode().is2xxSuccessful()).isTrue();
+                assertThat(signupResp.getStatusCode().is2xxSuccessful()).isTrue();
 
+                // ---------- SIGNIN ----------
+                ResponseEntity<String> signinResp = client.postForEntity(base + "/api/auth/signin", signupReq,
+                                String.class);
 
-        // ---------- SIGNIN ----------
-        ResponseEntity<String> signinResp =
-                client.postForEntity(base + "/api/auth/signin", signupReq, String.class);
+                Map<String, Object> signin = mapper.readValue(signinResp.getBody(), new TypeReference<>() {
+                });
 
-        Map<String,Object> signin =
-                mapper.readValue(signinResp.getBody(), new TypeReference<>() {});
+                String token = signin.get("token").toString();
 
-        String token = signin.get("token").toString();
+                System.out.println("JWT TOKEN: " + token);
 
-        System.out.println("JWT TOKEN: " + token);
+                assertThat(token).isNotNull();
 
-        assertThat(token).isNotNull();
+                User signedInUser = userRepository.findByUsername(username)
+                                .orElseThrow(() -> new RuntimeException("Signed in user was not found"));
 
-        User signedInUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Signed in user was not found"));
+                // ---------- CREATE GROUP ----------
+                HttpHeaders authHeaders = new HttpHeaders();
+                authHeaders.set("Authorization", "Bearer " + token);
+                authHeaders.setContentType(MediaType.APPLICATION_JSON);
 
+                ResponseEntity<String> groupResp = client.postForEntity(
+                                base + "/api/groups?name=TestTrip",
+                                new HttpEntity<>("", authHeaders),
+                                String.class);
 
-        // ---------- CREATE GROUP ----------
-        HttpHeaders authHeaders = new HttpHeaders();
-        authHeaders.set("Authorization","Bearer " + token);
-        authHeaders.setContentType(MediaType.APPLICATION_JSON);
+                System.out.println("Group created: " + groupResp.getBody());
 
-        ResponseEntity<String> groupResp =
-                client.postForEntity(
-                        base + "/api/groups?name=TestTrip",
-                        new HttpEntity<>("",authHeaders),
-                        String.class
-                );
+                assertThat(groupResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-        System.out.println("Group created: " + groupResp.getBody());
+                Map<String, Object> group = mapper.readValue(groupResp.getBody(), new TypeReference<>() {
+                });
 
-        assertThat(groupResp.getStatusCode().is2xxSuccessful()).isTrue();
+                String groupId = group.get("id").toString();
 
-        Map<String,Object> group =
-                mapper.readValue(groupResp.getBody(), new TypeReference<>() {});
+                assertThat(group.get("name")).isEqualTo("TestTrip");
 
-        String groupId = group.get("id").toString();
+                // ---------- CREATE EXPENSE ----------
+                Map<String, Object> expenseRequest = Map.of(
+                                "groupId", UUID.fromString(groupId),
+                                "description", "Dinner",
+                                "amount", 120,
+                                "paidByUserId", 1,
+                                "participants", List.of(signedInUser.getId()));
 
-        assertThat(group.get("name")).isEqualTo("TestTrip");
+                HttpEntity<String> expenseReq = new HttpEntity<>(mapper.writeValueAsString(expenseRequest),
+                                authHeaders);
 
+                ResponseEntity<String> expenseResp = client.postForEntity(
+                                base + "/api/expenses",
+                                expenseReq,
+                                String.class);
 
-        // ---------- CREATE EXPENSE ----------
-        Map<String,Object> expenseRequest = Map.of(
-                "groupId", UUID.fromString(groupId),
-                "description","Dinner",
-                "amount",120,
-                "paidByUserId",1,
-                "participants", List.of(signedInUser.getId())
-        );
+                System.out.println("Expense response: " + expenseResp.getBody());
 
-        HttpEntity<String> expenseReq =
-                new HttpEntity<>(mapper.writeValueAsString(expenseRequest),authHeaders);
+                assertThat(expenseResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-        ResponseEntity<String> expenseResp =
-                client.postForEntity(
-                        base + "/api/expenses",
-                        expenseReq,
-                        String.class
-                );
+                Map<String, Object> expenseResponseBody = mapper.readValue(expenseResp.getBody(),
+                                new TypeReference<>() {
+                                });
 
-        System.out.println("Expense response: " + expenseResp.getBody());
-
-        assertThat(expenseResp.getStatusCode().is2xxSuccessful()).isTrue();
-
-        Map<String,Object> expenseResponseBody =
-                mapper.readValue(expenseResp.getBody(), new TypeReference<>() {});
-
-        assertThat(Long.valueOf(expenseResponseBody.get("paidByUserId").toString()))
-                .isEqualTo(signedInUser.getId());
-    }
+                assertThat(Long.valueOf(expenseResponseBody.get("paidByUserId").toString()))
+                                .isEqualTo(signedInUser.getId());
+        }
 }

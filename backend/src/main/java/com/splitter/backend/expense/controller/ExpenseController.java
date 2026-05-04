@@ -34,8 +34,7 @@ public class ExpenseController {
                 request.description(),
                 request.amount(),
                 user.getId(),
-                request.participants()
-        );
+                request.participants());
     }
 
     public record CreateExpenseRequest(
@@ -43,6 +42,6 @@ public class ExpenseController {
             String description,
             BigDecimal amount,
             Long paidByUserId,
-            List<Long> participants
-    ) {}
+            List<Long> participants) {
+    }
 }

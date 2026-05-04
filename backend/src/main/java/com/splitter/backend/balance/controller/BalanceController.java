@@ -20,8 +20,7 @@ public class BalanceController {
     @GetMapping("/{groupId}/balances")
     public BalanceResponse getGroupBalances(
             @PathVariable UUID groupId,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         String username = authentication.getName();
         return balanceService.getGroupBalances(groupId, username);
     }

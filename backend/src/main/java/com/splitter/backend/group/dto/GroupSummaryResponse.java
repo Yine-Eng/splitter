@@ -13,7 +13,8 @@ public class GroupSummaryResponse {
     private LocalDateTime createdAt;
     private GroupRole role;
 
-    public GroupSummaryResponse(UUID groupId, String name, Long createdByUserId, LocalDateTime createdAt, GroupRole role) {
+    public GroupSummaryResponse(UUID groupId, String name, Long createdByUserId, LocalDateTime createdAt,
+            GroupRole role) {
         this.groupId = groupId;
         this.name = name;
         this.createdByUserId = createdByUserId;

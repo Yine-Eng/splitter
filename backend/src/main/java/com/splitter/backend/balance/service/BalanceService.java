@@ -41,8 +41,7 @@ public class BalanceService {
             ExpenseSplitRepository expenseSplitRepository,
             GroupMemberRepository groupMemberRepository,
             UserRepository userRepository,
-            SettlementRepository settlementRepository
-    ) {
+            SettlementRepository settlementRepository) {
         this.expenseRepository = expenseRepository;
         this.expenseSplitRepository = expenseSplitRepository;
         this.groupMemberRepository = groupMemberRepository;
@@ -55,8 +54,7 @@ public class BalanceService {
         User requester = userRepository.findByUsername(requesterUsername)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED,
-                        "Authenticated user not found"
-                ));
+                        "Authenticated user not found"));
 
         boolean isMember = groupMemberRepository
                 .findByGroupIdAndUserId(groupId, requester.getId())
@@ -65,8 +63,7 @@ public class BalanceService {
         if (!isMember) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "You are not a member of this group"
-            );
+                    "You are not a member of this group");
         }
 
         Map<Long, Map<Long, BigDecimal>> rawBalances = new HashMap<>();
@@ -121,8 +118,8 @@ public class BalanceService {
     }
 
     private void subtractConfirmedSettlementsFromBalances(UUID groupId, Map<Long, Map<Long, BigDecimal>> rawBalances) {
-        List<Settlement> confirmedSettlements =
-                settlementRepository.findByGroupIdAndStatus(groupId, SettlementStatus.CONFIRMED);
+        List<Settlement> confirmedSettlements = settlementRepository.findByGroupIdAndStatus(groupId,
+                SettlementStatus.CONFIRMED);
 
         for (Settlement settlement : confirmedSettlements) {
             Long fromUserId = settlement.getFromUserId();

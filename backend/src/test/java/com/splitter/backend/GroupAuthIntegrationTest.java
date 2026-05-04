@@ -16,10 +16,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = com.splitter.backend.SplitterBackendApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = com.splitter.backend.SplitterBackendApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 public class GroupAuthIntegrationTest {
         @LocalServerPort
@@ -31,9 +28,8 @@ public class GroupAuthIntegrationTest {
         void signupSigninCreateGroupFlow() throws Exception {
 
                 var signup = Map.of(
-                        "username", "itestuser_" + System.currentTimeMillis(),
-                        "password", "TestPass1!"
-                );
+                                "username", "itestuser_" + System.currentTimeMillis(),
+                                "password", "TestPass1!");
 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
@@ -52,19 +48,19 @@ public class GroupAuthIntegrationTest {
                 String base = "http://localhost:" + port;
 
                 // ---------- SIGNUP ----------
-                ResponseEntity<String> signupResp =
-                        plain.postForEntity(base + "/api/auth/signup", signupReq, String.class);
+                ResponseEntity<String> signupResp = plain.postForEntity(base + "/api/auth/signup", signupReq,
+                                String.class);
 
                 assertThat(signupResp.getStatusCode().is2xxSuccessful()).isTrue();
 
                 // ---------- SIGNIN ----------
-                ResponseEntity<String> signinResp =
-                        plain.postForEntity(base + "/api/auth/signin", signupReq, String.class);
+                ResponseEntity<String> signinResp = plain.postForEntity(base + "/api/auth/signin", signupReq,
+                                String.class);
 
                 assertThat(signinResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-                Map<String, Object> signinMap =
-                        mapper.readValue(signinResp.getBody(), new TypeReference<>() {});
+                Map<String, Object> signinMap = mapper.readValue(signinResp.getBody(), new TypeReference<>() {
+                });
 
                 String token = signinMap.get("token").toString();
 
@@ -75,27 +71,23 @@ public class GroupAuthIntegrationTest {
                 authHeaders.set("Authorization", "Bearer " + token);
                 authHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-                ResponseEntity<String> createResp =
-                        plain.postForEntity(
+                ResponseEntity<String> createResp = plain.postForEntity(
                                 base + "/api/groups?name=ITestGroup",
                                 new HttpEntity<>("", authHeaders),
-                                String.class
-                        );
+                                String.class);
 
                 assertThat(createResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-                Map<String, Object> groupMap =
-                        mapper.readValue(createResp.getBody(), new TypeReference<>() {});
+                Map<String, Object> groupMap = mapper.readValue(createResp.getBody(), new TypeReference<>() {
+                });
 
                 assertThat(groupMap.get("name")).isEqualTo("ITestGroup");
 
                 // ---------- UNAUTHENTICATED REQUEST ----------
-                ResponseEntity<String> noAuthResp =
-                        plain.postForEntity(
+                ResponseEntity<String> noAuthResp = plain.postForEntity(
                                 base + "/api/groups?name=NoAuth",
                                 new HttpEntity<>("", new HttpHeaders()),
-                                String.class
-                        );
+                                String.class);
 
                 assertThat(noAuthResp.getStatusCode().is4xxClientError()).isTrue();
         }

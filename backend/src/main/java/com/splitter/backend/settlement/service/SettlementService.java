@@ -24,6 +24,9 @@ import com.splitter.backend.settlement.dto.SettlementResponse;
 import com.splitter.backend.settlement.model.Settlement;
 import com.splitter.backend.settlement.model.SettlementStatus;
 import com.splitter.backend.settlement.repository.SettlementRepository;
+import com.splitter.backend.event.model.GroupEventType;
+import com.splitter.backend.event.model.GroupEventVisibility;
+import com.splitter.backend.event.service.GroupEventService;
 
 @Service
 public class SettlementService {
@@ -34,22 +37,26 @@ public class SettlementService {
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final BalanceService balanceService;
+    private final GroupEventService groupEventService;
 
     public SettlementService(
             SettlementRepository settlementRepository,
             UserRepository userRepository,
             GroupMemberRepository groupMemberRepository,
-            BalanceService balanceService
-    ) {
+            BalanceService balanceService,
+            GroupEventService groupEventService) {
         this.settlementRepository = settlementRepository;
         this.userRepository = userRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.balanceService = balanceService;
+        this.groupEventService = groupEventService;
     }
 
+    @Transactional
     public SettlementResponse createSettlement(String requesterUsername, CreateSettlementRequest request) {
         User fromUser = userRepository.findByUsername(requesterUsername)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
 
         if (request.groupId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group id is required");
@@ -84,9 +91,8 @@ public class SettlementService {
         BalanceResponse balanceResponse = balanceService.getGroupBalances(request.groupId(), requesterUsername);
 
         BigDecimal currentDebt = balanceResponse.getBalances().stream()
-                .filter(balance ->
-                        balance.getFromUserId().equals(fromUser.getId())
-                                && balance.getToUserId().equals(request.toUserId()))
+                .filter(balance -> balance.getFromUserId().equals(fromUser.getId())
+                        && balance.getToUserId().equals(request.toUserId()))
                 .map(UserBalanceDto::getAmount)
                 .findFirst()
                 .orElse(BigDecimal.ZERO);
@@ -96,7 +102,8 @@ public class SettlementService {
         }
 
         if (normalizedAmount.compareTo(currentDebt) > 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Settlement amount exceeds current outstanding debt");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Settlement amount exceeds current outstanding debt");
         }
 
         Settlement settlement = new Settlement(
@@ -104,10 +111,17 @@ public class SettlementService {
                 fromUser.getId(),
                 request.toUserId(),
                 normalizedAmount,
-                request.note() == null ? null : request.note().trim()
-        );
+                request.note() == null ? null : request.note().trim());
 
         Settlement saved = settlementRepository.save(settlement);
+        groupEventService.createGroupEvent(
+                saved.getGroupId(),
+                GroupEventType.SETTLEMENT_CREATED,
+                GroupEventVisibility.PRIVATE,
+                saved.getFromUserId(),
+                saved.getToUserId(),
+                saved.getAmount(),
+                "Settlement claim created");
         return toResponse(saved);
     }
 
@@ -117,7 +131,8 @@ public class SettlementService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Settlement not found"));
 
         User confirmer = userRepository.findByUsername(confirmerUsername)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
 
         if (!settlement.getToUserId().equals(confirmer.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the recipient can confirm this settlement");
@@ -130,9 +145,8 @@ public class SettlementService {
         BalanceResponse balanceResponse = balanceService.getGroupBalances(settlement.getGroupId(), confirmerUsername);
 
         BigDecimal currentDebt = balanceResponse.getBalances().stream()
-                .filter(balance ->
-                        balance.getFromUserId().equals(settlement.getFromUserId())
-                                && balance.getToUserId().equals(settlement.getToUserId()))
+                .filter(balance -> balance.getFromUserId().equals(settlement.getFromUserId())
+                        && balance.getToUserId().equals(settlement.getToUserId()))
                 .map(UserBalanceDto::getAmount)
                 .findFirst()
                 .orElse(BigDecimal.ZERO);
@@ -152,15 +166,25 @@ public class SettlementService {
         settlement.setConfirmedAt(LocalDateTime.now());
 
         Settlement saved = settlementRepository.save(settlement);
+        groupEventService.createGroupEvent(
+                saved.getGroupId(),
+                GroupEventType.SETTLEMENT_CONFIRMED,
+                GroupEventVisibility.GROUP,
+                saved.getToUserId(),
+                saved.getFromUserId(),
+                saved.getAmount(),
+                "Settlement confirmed");
         return toResponse(saved);
     }
 
+    @Transactional
     public SettlementResponse rejectSettlement(UUID settlementId, String rejectorUsername, String reason) {
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Settlement not found"));
 
         User rejector = userRepository.findByUsername(rejectorUsername)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
 
         if (!settlement.getToUserId().equals(rejector.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the recipient can reject this settlement");
@@ -175,12 +199,21 @@ public class SettlementService {
         settlement.setRejectionReason(reason == null ? null : reason.trim());
 
         Settlement saved = settlementRepository.save(settlement);
+        groupEventService.createGroupEvent(
+                saved.getGroupId(),
+                GroupEventType.SETTLEMENT_REJECTED,
+                GroupEventVisibility.PRIVATE,
+                saved.getToUserId(),
+                saved.getFromUserId(),
+                saved.getAmount(),
+                "Settlement rejected");
         return toResponse(saved);
     }
 
     public List<SettlementResponse> getIncomingPendingSettlements(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
 
         return settlementRepository
                 .findByToUserIdAndStatusOrderByCreatedAtDesc(user.getId(), SettlementStatus.PENDING)
@@ -191,7 +224,8 @@ public class SettlementService {
 
     public List<SettlementResponse> getOutgoingPendingSettlements(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
 
         return settlementRepository
                 .findByFromUserIdAndStatusOrderByCreatedAtDesc(user.getId(), SettlementStatus.PENDING)
@@ -202,7 +236,8 @@ public class SettlementService {
 
     public List<SettlementResponse> getGroupSettlementHistory(UUID groupId, String username) {
         User requester = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found"));
 
         boolean isMember = groupMemberRepository
                 .findByGroupIdAndUserId(groupId, requester.getId())
@@ -213,10 +248,10 @@ public class SettlementService {
         }
 
         return settlementRepository
-        .findByGroupIdAndStatusOrderByCreatedAtDesc(groupId, SettlementStatus.CONFIRMED)
-        .stream()
-        .map(this::toResponse)
-        .toList();
+                .findByGroupIdAndStatusOrderByCreatedAtDesc(groupId, SettlementStatus.CONFIRMED)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     private SettlementResponse toResponse(Settlement settlement) {
@@ -231,7 +266,6 @@ public class SettlementService {
                 settlement.getRejectionReason(),
                 settlement.getCreatedAt(),
                 settlement.getConfirmedAt(),
-                settlement.getRejectedAt()
-        );
+                settlement.getRejectedAt());
     }
 }
