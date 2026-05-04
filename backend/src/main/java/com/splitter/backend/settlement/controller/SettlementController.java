@@ -15,15 +15,19 @@ import com.splitter.backend.settlement.dto.CreateSettlementRequest;
 import com.splitter.backend.settlement.dto.RejectSettlementRequest;
 import com.splitter.backend.settlement.dto.SettlementResponse;
 import com.splitter.backend.settlement.service.SettlementService;
+import com.splitter.backend.notification.dto.NotificationResponse;
+import com.splitter.backend.notification.service.NotificationService;
 
 @RestController
 @RequestMapping("/api/settlements")
 public class SettlementController {
 
     private final SettlementService settlementService;
+    private final NotificationService notificationService;
 
-    public SettlementController(SettlementService settlementService) {
+    public SettlementController(SettlementService settlementService, NotificationService notificationService) {
         this.settlementService = settlementService;
+        this.notificationService = notificationService;
     }
 
     @PostMapping
@@ -64,5 +68,12 @@ public class SettlementController {
             @PathVariable UUID groupId,
             Authentication authentication) {
         return settlementService.getGroupSettlementHistory(groupId, authentication.getName());
+    }
+
+    @PostMapping("/{settlementId}/remind")
+    public NotificationResponse remindSettlementRecipient(
+            @PathVariable UUID settlementId,
+            Authentication authentication) {
+        return notificationService.remindSettlementRecipient(settlementId, authentication.getName());
     }
 }
