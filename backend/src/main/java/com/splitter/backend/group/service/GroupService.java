@@ -251,11 +251,11 @@ public class GroupService {
         return buildRemovalPreview(groupId, targetUser);
     }
 
+    @Transactional
     public GroupMemberRemovalPreviewResponse removeMember(
             UUID groupId,
             Long targetUserId,
-            String requesterUsername,
-            boolean confirmOutstandingBalances) {
+            String requesterUsername) {
         User requester = getUserByUsername(requesterUsername);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
@@ -290,10 +290,10 @@ public class GroupService {
 
         boolean hasOutstandingBalances = !preview.getUserOwes().isEmpty() || !preview.getUserIsOwed().isEmpty();
 
-        if (hasOutstandingBalances && !confirmOutstandingBalances) {
+        if (hasOutstandingBalances) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "This member has outstanding balances. Preview balances and confirm removal if you still want to proceed.");
+                    "This member has outstanding balances. Settle all balances before removal.");
         }
 
         targetMembership.markRemoved();

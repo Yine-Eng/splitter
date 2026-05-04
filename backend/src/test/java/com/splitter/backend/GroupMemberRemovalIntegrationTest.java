@@ -87,7 +87,7 @@ public class GroupMemberRemovalIntegrationTest {
         // ---------- NON-ADMIN CANNOT REMOVE ----------
         ResponseEntity<String> nonAdminRemoveResp = client.postForEntity(
                 base + "/api/groups/" + groupId + "/members/" + admin.getId() + "/remove",
-                new HttpEntity<>(mapper.writeValueAsString(Map.of("confirmOutstandingBalances", true)), memberHeaders),
+                new HttpEntity<>("", memberHeaders),
                 String.class);
 
         assertThat(nonAdminRemoveResp.getStatusCode().value()).isEqualTo(403);
@@ -151,7 +151,7 @@ public class GroupMemberRemovalIntegrationTest {
         // ---------- ADMIN CANNOT REMOVE WHILE PENDING SETTLEMENT EXISTS ----------
         ResponseEntity<String> removeWithPendingResp = client.postForEntity(
                 base + "/api/groups/" + groupId + "/members/" + member.getId() + "/remove",
-                new HttpEntity<>(mapper.writeValueAsString(Map.of("confirmOutstandingBalances", true)), adminHeaders),
+                new HttpEntity<>("", adminHeaders),
                 String.class);
 
         assertThat(removeWithPendingResp.getStatusCode().value()).isEqualTo(409);
@@ -164,24 +164,50 @@ public class GroupMemberRemovalIntegrationTest {
 
         assertThat(rejectResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-        // ---------- REMOVAL WITHOUT CONFIRMATION IS BLOCKED BECAUSE DEBT EXISTS
-        // ----------
-        ResponseEntity<String> removeWithoutConfirmationResp = client.postForEntity(
+        // ---------- REMOVAL BLOCKED BECAUSE OUTSTANDING BALANCE EXISTS ----------
+        ResponseEntity<String> removeBlockedResp = client.postForEntity(
                 base + "/api/groups/" + groupId + "/members/" + member.getId() + "/remove",
-                new HttpEntity<>(mapper.writeValueAsString(Map.of("confirmOutstandingBalances", false)), adminHeaders),
+                new HttpEntity<>("", adminHeaders),
                 String.class);
 
-        assertThat(removeWithoutConfirmationResp.getStatusCode().value()).isEqualTo(409);
+        assertThat(removeBlockedResp.getStatusCode().value()).isEqualTo(409);
 
-        // ---------- REMOVAL WITH CONFIRMATION SUCCEEDS ----------
-        ResponseEntity<String> removeWithConfirmationResp = client.postForEntity(
-                base + "/api/groups/" + groupId + "/members/" + member.getId() + "/remove",
-                new HttpEntity<>(mapper.writeValueAsString(Map.of("confirmOutstandingBalances", true)), adminHeaders),
+        // ---------- MEMBER FULLY SETTLES OUTSTANDING BALANCE ----------
+        Map<String, Object> fullSettlementRequest = Map.of(
+                "groupId", groupId,
+                "toUserId", admin.getId(),
+                "amount", "15.00",
+                "note", "Full payment");
+
+        ResponseEntity<String> fullSettlementResp = client.postForEntity(
+                base + "/api/settlements",
+                new HttpEntity<>(mapper.writeValueAsString(fullSettlementRequest), memberHeaders),
                 String.class);
 
-        assertThat(removeWithConfirmationResp.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(fullSettlementResp.getStatusCode().is2xxSuccessful()).isTrue();
 
-        Map<String, Object> removalResult = mapper.readValue(removeWithConfirmationResp.getBody(),
+        Map<String, Object> fullSettlementMap = mapper.readValue(fullSettlementResp.getBody(), new TypeReference<>() {
+        });
+
+        UUID fullSettlementId = UUID.fromString(fullSettlementMap.get("id").toString());
+
+        // ---------- ADMIN CONFIRMS FULL SETTLEMENT ----------
+        ResponseEntity<String> confirmResp = client.postForEntity(
+                base + "/api/settlements/" + fullSettlementId + "/confirm",
+                new HttpEntity<>("", adminHeaders),
+                String.class);
+
+        assertThat(confirmResp.getStatusCode().is2xxSuccessful()).isTrue();
+
+        // ---------- REMOVAL SUCCEEDS AFTER BALANCE SETTLED ----------
+        ResponseEntity<String> removeSuccessResp = client.postForEntity(
+                base + "/api/groups/" + groupId + "/members/" + member.getId() + "/remove",
+                new HttpEntity<>("", adminHeaders),
+                String.class);
+
+        assertThat(removeSuccessResp.getStatusCode().is2xxSuccessful()).isTrue();
+
+        Map<String, Object> removalResult = mapper.readValue(removeSuccessResp.getBody(),
                 new TypeReference<>() {
                 });
 

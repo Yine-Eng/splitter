@@ -25,7 +25,7 @@ public class GroupMember {
     @Column(nullable = false)
     private LocalDateTime joinedAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;
 
     private LocalDateTime removedAt;

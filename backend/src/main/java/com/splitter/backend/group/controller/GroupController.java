@@ -21,7 +21,6 @@ import com.splitter.backend.group.dto.GroupSummaryResponse;
 import com.splitter.backend.group.model.Group;
 import com.splitter.backend.group.service.GroupService;
 import com.splitter.backend.group.dto.GroupMemberRemovalPreviewResponse;
-import com.splitter.backend.group.dto.RemoveGroupMemberRequest;
 
 @RestController
 @RequestMapping("/api/groups")
@@ -86,15 +85,8 @@ public class GroupController {
     public GroupMemberRemovalPreviewResponse removeMember(
             @PathVariable UUID groupId,
             @PathVariable Long userId,
-            @RequestBody(required = false) RemoveGroupMemberRequest request,
             Authentication authentication) {
-        boolean confirmOutstandingBalances = request != null && request.confirmOutstandingBalances();
-
-        return groupService.removeMember(
-                groupId,
-                userId,
-                authentication.getName(),
-                confirmOutstandingBalances);
+        return groupService.removeMember(groupId, userId, authentication.getName());
     }
 
     public static record CreateGroupRequest(String name) {
