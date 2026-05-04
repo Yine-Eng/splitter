@@ -8,7 +8,18 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "notifications")
+@Table(
+        name = "notifications",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uq_notification_debt_reminder_per_day",
+                        columnNames = {"group_id", "sender_user_id", "recipient_user_id", "type", "reminder_date"})
+        },
+        indexes = {
+                @Index(
+                        name = "idx_notification_rate_limit",
+                        columnList = "group_id, sender_user_id, recipient_user_id, type, reminder_date")
+        })
 public class Notification {
 
     @Id

@@ -13,8 +13,10 @@ import com.splitter.backend.repository.UserRepository;
 import com.splitter.backend.settlement.model.Settlement;
 import com.splitter.backend.settlement.model.SettlementStatus;
 import com.splitter.backend.settlement.repository.SettlementRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@Transactional
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
@@ -96,8 +99,12 @@ public class NotificationService {
                 amountOwed,
                 "Debt reminder");
 
-        Notification saved = notificationRepository.save(notification);
-        return toResponse(saved);
+        try {
+            Notification saved = notificationRepository.saveAndFlush(notification);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "You already sent this reminder today");
+        }
     }
 
     public NotificationResponse remindSettlementRecipient(UUID settlementId, String requesterUsername) {
@@ -140,8 +147,13 @@ public class NotificationService {
                 settlement.getAmount(),
                 "Settlement confirmation reminder");
 
-        Notification saved = notificationRepository.save(notification);
-        return toResponse(saved);
+        try {
+            Notification saved = notificationRepository.saveAndFlush(notification);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "You already sent this settlement reminder today");
+        }
     }
 
     public List<NotificationResponse> getMyNotifications(String username) {

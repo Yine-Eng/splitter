@@ -277,8 +277,8 @@ public class NotificationReminderIntegrationTest {
     }
 
     private void assertAmountEquals(Object amountValue, String expected) {
-        BigDecimal actual = new BigDecimal(amountValue.toString()).setScale(2);
-        BigDecimal expectedBd = new BigDecimal(expected).setScale(2);
+        BigDecimal actual = new BigDecimal(amountValue.toString());
+        BigDecimal expectedBd = new BigDecimal(expected);
         assertThat(actual).isEqualByComparingTo(expectedBd);
     }
 

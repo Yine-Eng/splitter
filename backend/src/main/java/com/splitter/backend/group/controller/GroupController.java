@@ -21,15 +21,20 @@ import com.splitter.backend.group.dto.GroupSummaryResponse;
 import com.splitter.backend.group.model.Group;
 import com.splitter.backend.group.service.GroupService;
 import com.splitter.backend.group.dto.GroupMemberRemovalPreviewResponse;
+import com.splitter.backend.notification.dto.DebtReminderRequest;
+import com.splitter.backend.notification.dto.NotificationResponse;
+import com.splitter.backend.notification.service.NotificationService;
 
 @RestController
 @RequestMapping("/api/groups")
 public class GroupController {
 
     private final GroupService groupService;
+    private final NotificationService notificationService;
 
-    public GroupController(GroupService groupService) {
+    public GroupController(GroupService groupService, NotificationService notificationService) {
         this.groupService = groupService;
+        this.notificationService = notificationService;
     }
 
     @PostMapping
@@ -87,6 +92,17 @@ public class GroupController {
             @PathVariable Long userId,
             Authentication authentication) {
         return groupService.removeMember(groupId, userId, authentication.getName());
+    }
+
+    @PostMapping("/{groupId}/reminders/debt")
+    public NotificationResponse sendDebtReminder(
+            @PathVariable UUID groupId,
+            @RequestBody DebtReminderRequest request,
+            Authentication authentication) {
+        return notificationService.sendDebtReminder(
+                groupId,
+                authentication.getName(),
+                request.recipientUserId());
     }
 
     public static record CreateGroupRequest(String name) {
