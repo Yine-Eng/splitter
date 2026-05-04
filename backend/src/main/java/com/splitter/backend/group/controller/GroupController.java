@@ -35,8 +35,7 @@ public class GroupController {
     public Group createGroup(
             @RequestParam(required = false) String name,
             @RequestBody(required = false) CreateGroupRequest body,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         String groupName = (name != null ? name : (body != null ? body.name() : null));
 
         if (groupName == null || groupName.trim().isEmpty()) {
@@ -55,26 +54,24 @@ public class GroupController {
     public GroupMemberResponse addMember(
             @PathVariable UUID groupId,
             @RequestBody AddGroupMemberRequest request,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         return groupService.addMember(groupId, authentication.getName(), request.username());
     }
 
     @GetMapping("/{groupId}/members")
     public List<GroupMemberResponse> getGroupMembers(
             @PathVariable UUID groupId,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         return groupService.getGroupMembers(groupId, authentication.getName());
     }
 
     @GetMapping("/{groupId}/expenses")
     public List<GroupExpenseResponse> getGroupExpenses(
             @PathVariable UUID groupId,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         return groupService.getGroupExpenses(groupId, authentication.getName());
     }
 
-    public static record CreateGroupRequest(String name) {}
+    public static record CreateGroupRequest(String name) {
+    }
 }

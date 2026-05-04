@@ -34,8 +34,7 @@ public class SettlementResponse {
             String rejectionReason,
             LocalDateTime createdAt,
             LocalDateTime confirmedAt,
-            LocalDateTime rejectedAt
-    ) {
+            LocalDateTime rejectedAt) {
         this.id = id;
         this.groupId = groupId;
         this.fromUserId = fromUserId;

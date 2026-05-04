@@ -24,7 +24,8 @@ public class Group {
     @Column(nullable = false)
     private Integer remainderStartIndex;
 
-    public Group() {}
+    public Group() {
+    }
 
     public Group(String name, Long createdByUserId) {
         this.name = name;

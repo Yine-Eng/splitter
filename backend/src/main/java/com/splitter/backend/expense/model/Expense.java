@@ -28,7 +28,8 @@ public class Expense {
 
     private LocalDateTime createdAt;
 
-    public Expense() {}
+    public Expense() {
+    }
 
     public Expense(UUID groupId, String description, BigDecimal amount, Long paidByUserId) {
         this.groupId = groupId;
@@ -38,12 +39,31 @@ public class Expense {
         this.createdAt = LocalDateTime.now();
     }
 
-    public UUID getId() { return id; }
-    public UUID getGroupId() { return groupId; }
-    public String getDescription() { return description; }
-    public BigDecimal getAmount() { return amount; }
-    public Long getPaidByUserId() { return paidByUserId; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public UUID getId() {
+        return id;
+    }
 
-    public void setDescription(String description) { this.description = description; }
+    public UUID getGroupId() {
+        return groupId;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public Long getPaidByUserId() {
+        return paidByUserId;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
 }

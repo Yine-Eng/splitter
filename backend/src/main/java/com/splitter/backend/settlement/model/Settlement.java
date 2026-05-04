@@ -51,8 +51,7 @@ public class Settlement {
             Long fromUserId,
             Long toUserId,
             BigDecimal amount,
-            String note
-    ) {
+            String note) {
         this.groupId = groupId;
         this.fromUserId = fromUserId;
         this.toUserId = toUserId;

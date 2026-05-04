@@ -19,8 +19,7 @@ public class GroupExpenseResponse {
             String description,
             BigDecimal amount,
             Long paidByUserId,
-            LocalDateTime createdAt
-    ) {
+            LocalDateTime createdAt) {
         this.expenseId = expenseId;
         this.groupId = groupId;
         this.description = description;

@@ -25,7 +25,8 @@ public class ExpenseSplit {
     @Column(nullable = false)
     private boolean paid;
 
-    public ExpenseSplit() {}
+    public ExpenseSplit() {
+    }
 
     public ExpenseSplit(UUID expenseId, Long userId, BigDecimal amountOwed) {
         this.expenseId = expenseId;
@@ -34,10 +35,23 @@ public class ExpenseSplit {
         this.paid = false;
     }
 
-    public UUID getExpenseId() { return expenseId; }
-    public Long getUserId() { return userId; }
-    public BigDecimal getAmountOwed() { return amountOwed; }
-    public boolean isPaid() { return paid; }
+    public UUID getExpenseId() {
+        return expenseId;
+    }
 
-    public void setPaid(boolean paid) { this.paid = paid; }
+    public Long getUserId() {
+        return userId;
+    }
+
+    public BigDecimal getAmountOwed() {
+        return amountOwed;
+    }
+
+    public boolean isPaid() {
+        return paid;
+    }
+
+    public void setPaid(boolean paid) {
+        this.paid = paid;
+    }
 }

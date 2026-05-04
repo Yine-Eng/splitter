@@ -23,9 +23,9 @@ public class AuthController {
     private final JwtUtils jwtUtils;
 
     public AuthController(AuthenticationManager authenticationManager,
-                        UserRepository userRepository,
-                        PasswordEncoder encoder,
-                        JwtUtils jwtUtils) {
+            UserRepository userRepository,
+            PasswordEncoder encoder,
+            JwtUtils jwtUtils) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.encoder = encoder;
@@ -56,14 +56,12 @@ public class AuthController {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.get("username"),
-                        loginRequest.get("password"))
-        );
+                        loginRequest.get("password")));
 
         String jwt = jwtUtils.generateJwtToken(authentication);
 
         return ResponseEntity.ok(Map.of(
                 "token", jwt,
-                "type", "Bearer"
-        ));
+                "type", "Bearer"));
     }
 }

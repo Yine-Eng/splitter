@@ -29,16 +29,14 @@ public class SettlementController {
     @PostMapping
     public SettlementResponse createSettlement(
             @RequestBody CreateSettlementRequest request,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         return settlementService.createSettlement(authentication.getName(), request);
     }
 
     @PostMapping("/{settlementId}/confirm")
     public SettlementResponse confirmSettlement(
             @PathVariable UUID settlementId,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         return settlementService.confirmSettlement(settlementId, authentication.getName());
     }
 
@@ -46,8 +44,7 @@ public class SettlementController {
     public SettlementResponse rejectSettlement(
             @PathVariable UUID settlementId,
             @RequestBody(required = false) RejectSettlementRequest request,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         String reason = request == null ? null : request.reason();
         return settlementService.rejectSettlement(settlementId, authentication.getName(), reason);
     }
@@ -65,8 +62,7 @@ public class SettlementController {
     @GetMapping("/groups/{groupId}")
     public List<SettlementResponse> getGroupSettlementHistory(
             @PathVariable UUID groupId,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         return settlementService.getGroupSettlementHistory(groupId, authentication.getName());
     }
 }

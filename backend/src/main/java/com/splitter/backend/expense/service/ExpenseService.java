@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.splitter.backend.expense.model.Expense;
@@ -21,6 +22,9 @@ import com.splitter.backend.group.model.Group;
 import com.splitter.backend.group.model.GroupMember;
 import com.splitter.backend.group.repository.GroupMemberRepository;
 import com.splitter.backend.group.repository.GroupRepository;
+import com.splitter.backend.event.model.GroupEventType;
+import com.splitter.backend.event.model.GroupEventVisibility;
+import com.splitter.backend.event.service.GroupEventService;
 
 @Service
 public class ExpenseService {
@@ -29,26 +33,28 @@ public class ExpenseService {
     private final ExpenseSplitRepository expenseSplitRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final GroupRepository groupRepository;
+    private final GroupEventService groupEventService;
 
     public ExpenseService(
             ExpenseRepository expenseRepository,
             ExpenseSplitRepository expenseSplitRepository,
             GroupMemberRepository groupMemberRepository,
-            GroupRepository groupRepository
-    ) {
+            GroupRepository groupRepository,
+            GroupEventService groupEventService) {
         this.expenseRepository = expenseRepository;
         this.expenseSplitRepository = expenseSplitRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.groupRepository = groupRepository;
+        this.groupEventService = groupEventService;
     }
 
+    @Transactional
     public Expense createExpense(
             UUID groupId,
             String description,
             BigDecimal amount,
             Long paidByUserId,
-            List<Long> participants
-    ) {
+            List<Long> participants) {
 
         if (groupId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group id is required");
@@ -88,8 +94,7 @@ public class ExpenseService {
             if (participantId == null || !memberIds.contains(participantId)) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "All participants must be members of the group"
-                );
+                        "All participants must be members of the group");
             }
         }
 
@@ -125,8 +130,7 @@ public class ExpenseService {
                 ExpenseSplit split = new ExpenseSplit(
                         savedExpense.getId(),
                         userId,
-                        shareByUserId.get(userId)
-                );
+                        shareByUserId.get(userId));
 
                 expenseSplitRepository.save(split);
             }
@@ -135,6 +139,15 @@ public class ExpenseService {
         int nextStartIndex = (startIndex + remainderCents) % participantCount;
         group.setRemainderStartIndex(nextStartIndex);
         groupRepository.save(group);
+
+        groupEventService.createGroupEvent(
+                groupId,
+                GroupEventType.EXPENSE_CREATED,
+                GroupEventVisibility.GROUP,
+                paidByUserId,
+                null,
+                normalizedAmount,
+                "Expense created: " + description.trim());
 
         return savedExpense;
     }

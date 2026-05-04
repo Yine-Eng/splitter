@@ -22,6 +22,5 @@ public interface SettlementRepository extends JpaRepository<Settlement, UUID> {
             UUID groupId,
             Long fromUserId,
             Long toUserId,
-            SettlementStatus status
-    );
+            SettlementStatus status);
 }

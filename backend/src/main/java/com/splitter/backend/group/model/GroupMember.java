@@ -25,7 +25,8 @@ public class GroupMember {
     @Column(nullable = false)
     private LocalDateTime joinedAt;
 
-    public GroupMember() {}
+    public GroupMember() {
+    }
 
     public GroupMember(UUID groupId, Long userId, GroupRole role) {
         this.groupId = groupId;
@@ -38,23 +39,23 @@ public class GroupMember {
         return id;
     }
 
-    public UUID getGroupId() { 
-        return groupId; 
+    public UUID getGroupId() {
+        return groupId;
     }
 
-    public Long getUserId() { 
-        return userId; 
+    public Long getUserId() {
+        return userId;
     }
 
-    public GroupRole getRole() { 
-        return role; 
+    public GroupRole getRole() {
+        return role;
     }
 
     public LocalDateTime getJoinedAt() {
         return joinedAt;
     }
 
-    public void setRole(GroupRole role) { 
-        this.role = role; 
+    public void setRole(GroupRole role) {
+        this.role = role;
     }
 }
