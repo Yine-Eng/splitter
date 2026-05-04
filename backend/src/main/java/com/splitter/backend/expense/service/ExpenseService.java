@@ -75,6 +75,10 @@ public class ExpenseService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
 
+        if (group.isArchived()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Group is archived");
+        }
+
         List<GroupMember> members = groupMemberRepository.findByGroupIdAndActiveTrue(groupId);
         Set<Long> memberIds = new HashSet<>();
         for (GroupMember member : members) {

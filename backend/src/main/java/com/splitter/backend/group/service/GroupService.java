@@ -36,6 +36,8 @@ import com.splitter.backend.group.dto.RemovalBalanceItem;
 import com.splitter.backend.settlement.model.Settlement;
 import com.splitter.backend.settlement.model.SettlementStatus;
 import com.splitter.backend.settlement.repository.SettlementRepository;
+import com.splitter.backend.group.dto.GroupAdminActionResponse;
+import java.time.LocalDateTime;
 
 import java.math.BigDecimal;
 
@@ -90,6 +92,10 @@ public class GroupService {
 
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+
+        if (group.isArchived()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Group is archived");
+        }
 
         GroupMember requesterMembership = groupMemberRepository
                 .findByGroupIdAndUserIdAndActiveTrue(group.getId(), requester.getId())
@@ -189,7 +195,8 @@ public class GroupService {
                     group.getName(),
                     group.getCreatedByUserId(),
                     group.getCreatedAt(),
-                    membership.getRole()));
+                    membership.getRole(),
+                    group.isArchived()));
         }
 
         responses.sort(Comparator.comparing(GroupSummaryResponse::getCreatedAt).reversed());
@@ -309,6 +316,169 @@ public class GroupService {
                 "Member removed from group");
 
         return preview;
+    }
+
+    @Transactional
+    public GroupAdminActionResponse renameGroup(UUID groupId, String requesterUsername, String newName) {
+        User requester = getUserByUsername(requesterUsername);
+        Group group = getActiveGroup(groupId);
+
+        ensureUserIsGroupAdmin(groupId, requester.getId());
+
+        if (newName == null || newName.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group name is required");
+        }
+
+        String trimmedName = newName.trim();
+
+        if (trimmedName.length() > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group name cannot exceed 100 characters");
+        }
+
+        group.setName(trimmedName);
+        Group savedGroup = groupRepository.save(group);
+
+        groupEventService.createGroupEvent(
+                groupId,
+                GroupEventType.GROUP_RENAMED,
+                GroupEventVisibility.GROUP,
+                requester.getId(),
+                null,
+                null,
+                "Group renamed");
+
+        return new GroupAdminActionResponse(
+                savedGroup.getId(),
+                savedGroup.getName(),
+                null,
+                null,
+                savedGroup.isArchived(),
+                LocalDateTime.now());
+    }
+
+    @Transactional
+    public GroupAdminActionResponse promoteMember(UUID groupId, Long targetUserId, String requesterUsername) {
+        User requester = getUserByUsername(requesterUsername);
+        Group group = getActiveGroup(groupId);
+
+        ensureUserIsGroupAdmin(groupId, requester.getId());
+
+        GroupMember targetMembership = groupMemberRepository
+                .findByGroupIdAndUserIdAndActiveTrue(groupId, targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "User is not an active member of this group"));
+
+        if (targetMembership.getRole() == GroupRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already an admin");
+        }
+
+        targetMembership.setRole(GroupRole.ADMIN);
+        GroupMember savedMembership = groupMemberRepository.save(targetMembership);
+
+        groupEventService.createGroupEvent(
+                groupId,
+                GroupEventType.MEMBER_PROMOTED,
+                GroupEventVisibility.GROUP,
+                requester.getId(),
+                targetUserId,
+                null,
+                "Member promoted to admin");
+
+        return new GroupAdminActionResponse(
+                group.getId(),
+                group.getName(),
+                targetUserId,
+                savedMembership.getRole(),
+                group.isArchived(),
+                LocalDateTime.now());
+    }
+
+    @Transactional
+    public GroupAdminActionResponse demoteAdmin(UUID groupId, Long targetUserId, String requesterUsername) {
+        User requester = getUserByUsername(requesterUsername);
+        Group group = getActiveGroup(groupId);
+
+        ensureUserIsGroupAdmin(groupId, requester.getId());
+
+        GroupMember targetMembership = groupMemberRepository
+                .findByGroupIdAndUserIdAndActiveTrue(groupId, targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "User is not an active member of this group"));
+
+        if (targetMembership.getRole() != GroupRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is not an admin");
+        }
+
+        if (group.getCreatedByUserId().equals(targetUserId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group creator cannot be demoted");
+        }
+
+        long activeAdminCount = groupMemberRepository
+                .findByGroupIdAndRoleAndActiveTrueWithLock(groupId, GroupRole.ADMIN)
+                .size();
+
+        if (activeAdminCount <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Group must have at least one active admin");
+        }
+
+        targetMembership.setRole(GroupRole.MEMBER);
+        GroupMember savedMembership = groupMemberRepository.save(targetMembership);
+
+        groupEventService.createGroupEvent(
+                groupId,
+                GroupEventType.MEMBER_DEMOTED,
+                GroupEventVisibility.GROUP,
+                requester.getId(),
+                targetUserId,
+                null,
+                "Admin demoted to member");
+
+        return new GroupAdminActionResponse(
+                group.getId(),
+                group.getName(),
+                targetUserId,
+                savedMembership.getRole(),
+                group.isArchived(),
+                LocalDateTime.now());
+    }
+
+    @Transactional
+    public GroupAdminActionResponse archiveGroup(UUID groupId, String requesterUsername) {
+        User requester = getUserByUsername(requesterUsername);
+        Group group = getActiveGroup(groupId);
+
+        ensureUserIsGroupAdmin(groupId, requester.getId());
+
+        group.archive();
+        Group savedGroup = groupRepository.save(group);
+
+        groupEventService.createGroupEvent(
+                groupId,
+                GroupEventType.GROUP_ARCHIVED,
+                GroupEventVisibility.GROUP,
+                requester.getId(),
+                null,
+                null,
+                "Group archived");
+
+        return new GroupAdminActionResponse(
+                savedGroup.getId(),
+                savedGroup.getName(),
+                null,
+                null,
+                savedGroup.isArchived(),
+                LocalDateTime.now());
+    }
+
+    private Group getActiveGroup(UUID groupId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+
+        if (group.isArchived()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Group is archived");
+        }
+
+        return group;
     }
 
     private GroupMemberRemovalPreviewResponse buildRemovalPreview(UUID groupId, User targetUser) {
