@@ -12,14 +12,16 @@ public class GroupSummaryResponse {
     private Long createdByUserId;
     private LocalDateTime createdAt;
     private GroupRole role;
+    private boolean archived;
 
     public GroupSummaryResponse(UUID groupId, String name, Long createdByUserId, LocalDateTime createdAt,
-            GroupRole role) {
+            GroupRole role, boolean archived) {
         this.groupId = groupId;
         this.name = name;
         this.createdByUserId = createdByUserId;
         this.createdAt = createdAt;
         this.role = role;
+        this.archived = archived;
     }
 
     public UUID getGroupId() {
@@ -40,5 +42,9 @@ public class GroupSummaryResponse {
 
     public GroupRole getRole() {
         return role;
+    }
+
+    public boolean isArchived() {
+        return archived;
     }
 }

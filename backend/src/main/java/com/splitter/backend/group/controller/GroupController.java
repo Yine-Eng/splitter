@@ -24,6 +24,9 @@ import com.splitter.backend.group.dto.GroupMemberRemovalPreviewResponse;
 import com.splitter.backend.notification.dto.DebtReminderRequest;
 import com.splitter.backend.notification.dto.NotificationResponse;
 import com.splitter.backend.notification.service.NotificationService;
+import com.splitter.backend.group.dto.GroupAdminActionResponse;
+import com.splitter.backend.group.dto.RenameGroupRequest;
+import org.springframework.web.bind.annotation.PatchMapping;
 
 @RestController
 @RequestMapping("/api/groups")
@@ -103,6 +106,37 @@ public class GroupController {
                 groupId,
                 authentication.getName(),
                 request.recipientUserId());
+    }
+
+    @PatchMapping("/{groupId}/rename")
+    public GroupAdminActionResponse renameGroup(
+            @PathVariable UUID groupId,
+            @RequestBody RenameGroupRequest request,
+            Authentication authentication) {
+        return groupService.renameGroup(groupId, authentication.getName(), request.name());
+    }
+
+    @PostMapping("/{groupId}/members/{userId}/promote")
+    public GroupAdminActionResponse promoteMember(
+            @PathVariable UUID groupId,
+            @PathVariable Long userId,
+            Authentication authentication) {
+        return groupService.promoteMember(groupId, userId, authentication.getName());
+    }
+
+    @PostMapping("/{groupId}/members/{userId}/demote")
+    public GroupAdminActionResponse demoteAdmin(
+            @PathVariable UUID groupId,
+            @PathVariable Long userId,
+            Authentication authentication) {
+        return groupService.demoteAdmin(groupId, userId, authentication.getName());
+    }
+
+    @PostMapping("/{groupId}/archive")
+    public GroupAdminActionResponse archiveGroup(
+            @PathVariable UUID groupId,
+            Authentication authentication) {
+        return groupService.archiveGroup(groupId, authentication.getName());
     }
 
     public static record CreateGroupRequest(String name) {
