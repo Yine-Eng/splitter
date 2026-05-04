@@ -413,7 +413,9 @@ public class GroupService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group creator cannot be demoted");
         }
 
-        long activeAdminCount = groupMemberRepository.countByGroupIdAndRoleAndActiveTrue(groupId, GroupRole.ADMIN);
+        long activeAdminCount = groupMemberRepository
+                .findByGroupIdAndRoleAndActiveTrueWithLock(groupId, GroupRole.ADMIN)
+                .size();
 
         if (activeAdminCount <= 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Group must have at least one active admin");

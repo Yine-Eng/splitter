@@ -24,7 +24,7 @@ public class Group {
     @Column(nullable = false)
     private Integer remainderStartIndex;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean archived = false;
 
     private LocalDateTime archivedAt;

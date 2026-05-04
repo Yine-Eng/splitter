@@ -38,7 +38,7 @@ public class SettlementService {
     private final SettlementRepository settlementRepository;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
-        private final GroupRepository groupRepository;
+    private final GroupRepository groupRepository;
     private final BalanceService balanceService;
     private final GroupEventService groupEventService;
 
@@ -46,13 +46,13 @@ public class SettlementService {
             SettlementRepository settlementRepository,
             UserRepository userRepository,
             GroupMemberRepository groupMemberRepository,
-                        GroupRepository groupRepository,
+            GroupRepository groupRepository,
             BalanceService balanceService,
             GroupEventService groupEventService) {
         this.settlementRepository = settlementRepository;
         this.userRepository = userRepository;
         this.groupMemberRepository = groupMemberRepository;
-                this.groupRepository = groupRepository;
+        this.groupRepository = groupRepository;
         this.balanceService = balanceService;
         this.groupEventService = groupEventService;
     }
@@ -79,6 +79,13 @@ public class SettlementService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot settle with yourself");
         }
 
+        Group group = groupRepository.findById(request.groupId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+
+        if (group.isArchived()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Group is archived");
+        }
+
         boolean requesterInGroup = groupMemberRepository
                 .findByGroupIdAndUserIdAndActiveTrue(request.groupId(), fromUser.getId())
                 .isPresent();
@@ -90,13 +97,6 @@ public class SettlementService {
         if (!requesterInGroup || !recipientInGroup) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Both users must be members of the group");
         }
-
-                Group group = groupRepository.findById(request.groupId())
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
-
-                if (group.isArchived()) {
-                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Group is archived");
-                }
 
         BigDecimal normalizedAmount = request.amount().setScale(2, RoundingMode.HALF_UP);
 
