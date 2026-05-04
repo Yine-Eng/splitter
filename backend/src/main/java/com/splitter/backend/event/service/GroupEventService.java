@@ -72,10 +72,7 @@ public class GroupEventService {
                 GroupEventVisibility.GROUP);
 
         List<GroupEvent> privateEvents = groupEventRepository
-                .findByGroupIdAndVisibilityAndActorUserIdOrGroupIdAndVisibilityAndTargetUserIdOrderByCreatedAtDesc(
-                        groupId,
-                        GroupEventVisibility.PRIVATE,
-                        requester.getId(),
+                .findPrivateEventsForUser(
                         groupId,
                         GroupEventVisibility.PRIVATE,
                         requester.getId());

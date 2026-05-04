@@ -3,6 +3,8 @@ package com.splitter.backend.event.repository;
 import com.splitter.backend.event.model.GroupEvent;
 import com.splitter.backend.event.model.GroupEventVisibility;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.UUID;
@@ -13,11 +15,9 @@ public interface GroupEventRepository extends JpaRepository<GroupEvent, UUID> {
             UUID groupId,
             GroupEventVisibility visibility);
 
-    List<GroupEvent> findByGroupIdAndVisibilityAndActorUserIdOrGroupIdAndVisibilityAndTargetUserIdOrderByCreatedAtDesc(
-            UUID groupId1,
-            GroupEventVisibility visibility1,
-            Long actorUserId,
-            UUID groupId2,
-            GroupEventVisibility visibility2,
-            Long targetUserId);
+    @Query("SELECT e FROM GroupEvent e WHERE e.groupId = :groupId AND e.visibility = :visibility AND (e.actorUserId = :userId OR e.targetUserId = :userId) ORDER BY e.createdAt DESC")
+    List<GroupEvent> findPrivateEventsForUser(
+            @Param("groupId") UUID groupId,
+            @Param("visibility") GroupEventVisibility visibility,
+            @Param("userId") Long userId);
 }

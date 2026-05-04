@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.splitter.backend.expense.model.Expense;
@@ -63,6 +64,7 @@ public class GroupService {
         return savedGroup;
     }
 
+    @Transactional
     public GroupMemberResponse addMember(UUID groupId, String requesterUsername, String targetUsername) {
         User requester = getUserByUsername(requesterUsername);
 

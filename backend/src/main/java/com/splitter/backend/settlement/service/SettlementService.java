@@ -52,6 +52,7 @@ public class SettlementService {
         this.groupEventService = groupEventService;
     }
 
+    @Transactional
     public SettlementResponse createSettlement(String requesterUsername, CreateSettlementRequest request) {
         User fromUser = userRepository.findByUsername(requesterUsername)
                 .orElseThrow(
@@ -176,6 +177,7 @@ public class SettlementService {
         return toResponse(saved);
     }
 
+    @Transactional
     public SettlementResponse rejectSettlement(UUID settlementId, String rejectorUsername, String reason) {
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Settlement not found"));

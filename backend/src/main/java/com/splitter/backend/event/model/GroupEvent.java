@@ -30,6 +30,7 @@ public class GroupEvent {
 
     private Long targetUserId;
 
+    @Column(precision = 19, scale = 2)
     private BigDecimal amount;
 
     @Column(length = 1000)

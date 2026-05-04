@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.splitter.backend.expense.model.Expense;
@@ -47,6 +48,7 @@ public class ExpenseService {
         this.groupEventService = groupEventService;
     }
 
+    @Transactional
     public Expense createExpense(
             UUID groupId,
             String description,
