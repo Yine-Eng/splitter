@@ -3,7 +3,9 @@ package com.splitter.backend.notification.service;
 import com.splitter.backend.balance.dto.BalanceResponse;
 import com.splitter.backend.balance.dto.UserBalanceDto;
 import com.splitter.backend.balance.service.BalanceService;
+import com.splitter.backend.group.model.Group;
 import com.splitter.backend.group.repository.GroupMemberRepository;
+import com.splitter.backend.group.repository.GroupRepository;
 import com.splitter.backend.models.User;
 import com.splitter.backend.notification.dto.NotificationResponse;
 import com.splitter.backend.notification.model.Notification;
@@ -31,6 +33,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final GroupRepository groupRepository;
     private final BalanceService balanceService;
     private final SettlementRepository settlementRepository;
 
@@ -38,11 +41,13 @@ public class NotificationService {
             NotificationRepository notificationRepository,
             UserRepository userRepository,
             GroupMemberRepository groupMemberRepository,
+            GroupRepository groupRepository,
             BalanceService balanceService,
             SettlementRepository settlementRepository) {
         this.notificationRepository = notificationRepository;
         this.userRepository = userRepository;
         this.groupMemberRepository = groupMemberRepository;
+        this.groupRepository = groupRepository;
         this.balanceService = balanceService;
         this.settlementRepository = settlementRepository;
     }
@@ -112,6 +117,13 @@ public class NotificationService {
 
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Settlement not found"));
+
+        Group group = groupRepository.findById(settlement.getGroupId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+
+        if (group.isArchived()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Group is archived");
+        }
 
         if (!settlement.getFromUserId().equals(requester.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
